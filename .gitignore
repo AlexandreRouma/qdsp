@@ -1,0 +1,6 @@
+build/
+.vscode/
+*.old
+*.dll
+*.exe
+*.zip
