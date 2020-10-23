@@ -25,11 +25,14 @@ namespace dsp {
             data = (T*)volk_malloc(STREAM_BUFFER_SIZE * sizeof(T), volk_get_alignment());
         }
 
-        int write(int size) {
+        int aquire() {
             waitReady();
             if (writerStop) {
                 return -1;
             }
+        }
+
+        int write(int size) {
             std::lock_guard<std::mutex> lck(sigMtx);
             contentSize = size;
             dataReady = true;

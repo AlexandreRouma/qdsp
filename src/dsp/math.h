@@ -30,6 +30,7 @@ namespace dsp {
                 return 0;
             }
 
+            out.aquire();
             if constexpr (std::is_same_v<T, complex_t> || std::is_same_v<T, stereo_t>) {
                 volk_32fc_x2_add_32fc(_a->data, _b->data, out.data, a_count);
             }
@@ -78,6 +79,7 @@ namespace dsp {
                 return 0;
             }
 
+            out.aquire();
             if constexpr (std::is_same_v<T, complex_t>) {
                 volk_32fc_x2_multiply_32fc(_a->data, _b->data, out.data, a_count);
             }

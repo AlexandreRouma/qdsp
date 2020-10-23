@@ -17,8 +17,7 @@ namespace dsp {
             if (running) {
                 return;
             }
-            running = true;
-            workerThread = std::thread(&generic_block::workerLoop, this);
+            doStart();
         }
 
         virtual void stop() {
@@ -26,19 +25,7 @@ namespace dsp {
             if (!running) {
                 return;
             }
-            for (auto const& in : inputs) {
-                in->stopReader();
-            }
-            for (auto const& out : outputs) {
-                out->stopWriter();
-            }
-            workerThread.join();
-            for (auto const& in : inputs) {
-                in->clearReadStop();
-            }
-            for (auto const& out : outputs) {
-                out->clearWriteStop();
-            }
+            doStop();
         }
 
         virtual int calcOutSize(int inSize) { return -1; }
@@ -76,10 +63,46 @@ namespace dsp {
             outputs.erase(std::remove(outputs.begin(), outputs.end(), outStream), outputs.end());
         }
 
+        void doStart() {
+            running = true;
+            workerThread = std::thread(&generic_block::workerLoop, this);
+        }
+
+        void doStop() {
+            for (auto const& in : inputs) {
+                in->stopReader();
+            }
+            for (auto const& out : outputs) {
+                out->stopWriter();
+            }
+            workerThread.join();
+            for (auto const& in : inputs) {
+                in->clearReadStop();
+            }
+            for (auto const& out : outputs) {
+                out->clearWriteStop();
+            }
+        }
+
+        void tempStart() {
+            if (tempStopped) {
+                doStart();
+                tempStopped = false;
+            }
+        }
+
+        void tempStop() {
+            if (running) {
+                doStop();
+                tempStopped = true;
+            }
+        }
+
         std::vector<untyped_steam*> inputs;
         std::vector<untyped_steam*> outputs;
 
         bool running = false;
+        bool tempStopped = false;
 
         std::thread workerThread;
 
