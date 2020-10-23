@@ -45,6 +45,7 @@ namespace dsp {
         stream<T> out;
 
     private:
+        int a_count, b_count;
         stream<T>* _a;
         stream<T>* _b;
 

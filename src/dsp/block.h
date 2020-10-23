@@ -13,19 +13,17 @@ namespace dsp {
         virtual void init() {}
 
         virtual void start() {
-            aquire();
+            std::lock_guard<std::mutex> lck(ctrlMtx);
             if (running) {
                 return;
             }
             running = true;
             workerThread = std::thread(&generic_block::workerLoop, this);
-            release();
         }
 
         virtual void stop() {
-            aquire();
+            std::lock_guard<std::mutex> lck(ctrlMtx);
             if (!running) {
-                release();
                 return;
             }
             for (auto const& in : inputs) {
@@ -41,15 +39,11 @@ namespace dsp {
             for (auto const& out : outputs) {
                 out->clearWriteStop();
             }
-            release();
         }
 
         virtual int calcOutSize(int inSize) { return -1; }
 
-        virtual int run() {
-            printf("UH OH: BASE WORKER RAN!!!\n");
-            return -1;
-        }
+        virtual int run() = 0;
         
         friend BLOCK;
 
@@ -85,11 +79,12 @@ namespace dsp {
         std::vector<untyped_steam*> inputs;
         std::vector<untyped_steam*> outputs;
 
-        std::mutex ctrlMtx;
-
         bool running = false;
 
         std::thread workerThread;
+
+    protected:
+        std::mutex ctrlMtx;
 
     };
 }
