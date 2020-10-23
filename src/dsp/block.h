@@ -65,7 +65,7 @@ namespace dsp {
         }
 
         void unregisterInput(untyped_steam* inSteam) {
-            
+            inputs.erase(std::remove(inputs.begin(), inputs.end(), inStream), inputs.end());
         }
 
         void registerOutput(untyped_steam* outStream) {
@@ -73,7 +73,7 @@ namespace dsp {
         }
 
         void unregisterOutput(untyped_steam* outStream) {
-            
+            outputs.erase(std::remove(outputs.begin(), outputs.end(), outStream), outputs.end());
         }
 
         std::vector<untyped_steam*> inputs;
