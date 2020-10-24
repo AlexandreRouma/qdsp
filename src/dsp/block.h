@@ -47,11 +47,11 @@ namespace dsp {
             ctrlMtx.unlock();
         }
 
-        void registerInput(untyped_steam* inSteam) {
-            inputs.push_back(inSteam);
+        void registerInput(untyped_steam* inStream) {
+            inputs.push_back(inStream);
         }
 
-        void unregisterInput(untyped_steam* inSteam) {
+        void unregisterInput(untyped_steam* inStream) {
             inputs.erase(std::remove(inputs.begin(), inputs.end(), inStream), inputs.end());
         }
 
