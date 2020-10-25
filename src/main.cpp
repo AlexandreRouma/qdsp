@@ -23,6 +23,12 @@ int main() {
 
     demod.start();
 
+    // fill in_stream random data
+    for (int i = 0; i < 1000000; i++) {
+        in_stream.data[i].i = float(rand())/float((RAND_MAX)) - 1.0f;
+        in_stream.data[i].q = float(rand())/float((RAND_MAX)) - 1.0f;
+    }
+
     while(1) {
         auto start = std::chrono::high_resolution_clock::now();
         for (int i = 0; i < 1000; i++) {
