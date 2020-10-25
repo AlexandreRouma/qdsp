@@ -5,6 +5,7 @@
 #include <dsp/routing.h>
 #include <dsp/math.h>
 #include <dsp/demodulator.h>
+#include <dsp/filter.h>
 #include <thread>
 #include <chrono>
 #include <iostream>
@@ -19,9 +20,11 @@
 int main() {
     printf("Hello World!\n");
 
+    const int ROUNDS = 1;
+
     dsp::stream<dsp::complex_t> in_stream;
-    dsp::FMDemod demod(&in_stream, 1000000, 100000);
-    
+    dsp::PolyphaseFIR<32> demod(&in_stream, 1000000, 500000, 10000);
+
     for (int i = 0; i < 1000000; i++) {
         in_stream.data[i].i = float(rand())/float((RAND_MAX)) - 1.0f;;
         in_stream.data[i].q = float(rand())/float((RAND_MAX)) - 1.0f;;
@@ -31,7 +34,7 @@ int main() {
 
     float speed = 0.0f;
 
-    for (int r = 0; r < 10; r++) {
+    for (int r = 0; r < ROUNDS; r++) {
         auto start = std::chrono::high_resolution_clock::now();
         for (int i = 0; i < 1000; i++) {
             in_stream.aquire();
@@ -44,10 +47,10 @@ int main() {
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start); 
 
         speed += ((1000000.0 / duration.count()) * 1000000000.0) / 1000000.0;
-        std::cout << "Round " << r << std::endl;
+        std::cout << "Round " << r + 1 << std::endl;
     }
 
-    std::cout << "Average Speed: " << (speed/10.0f) << " MS/s" << std::endl;
+    std::cout << "Average Speed: " << (speed/(float)ROUNDS) << " MS/s" << std::endl;
 
     printf("Returning!\n");
 

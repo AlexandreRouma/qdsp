@@ -6,6 +6,8 @@
 #include <vector>
 #include <algorithm>
 
+#define FL_M_PI                3.1415926535f
+
 namespace dsp {
     
     template <class BLOCK>
