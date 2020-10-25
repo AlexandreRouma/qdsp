@@ -4,6 +4,7 @@
 #include <dsp/types.h>
 #include <thread>
 #include <vector>
+#include <algorithm>
 
 namespace dsp {
     

@@ -1,5 +1,6 @@
 #pragma once
 #include <dsp/block.h>
+#include <cstring>
 
 namespace dsp {
     template <class T>
@@ -9,36 +10,36 @@ namespace dsp {
 
         Splitter(stream<T>* in) { init(in); }
 
-        ~Splitter() { generic_block::stop(); }
+        ~Splitter() { generic_block<Splitter>::stop(); }
 
         void init(stream<T>* in) {
             _in = in;
-            generic_block::registerInput(_in);
+            generic_block<Splitter>::registerInput(_in);
         }
 
         void setInput(stream<T>* in) {
-            std::lock_guard<std::mutex> lck(ctrlMtx);
-            generic_block::tempStop();
-            generic_block::unregisterInput(_in);
+            std::lock_guard<std::mutex> lck(generic_block<Splitter>::ctrlMtx);
+            generic_block<Splitter>::tempStop();
+            generic_block<Splitter>::unregisterInput(_in);
             _in = in;
-            generic_block::registerInput(_in);
-            generic_block::tempStart();
+            generic_block<Splitter>::registerInput(_in);
+            generic_block<Splitter>::tempStart();
         }
 
         void bindStream(stream<T>* stream) {
-            std::lock_guard<std::mutex> lck(ctrlMtx);
-            generic_block::tempStop();
+            std::lock_guard<std::mutex> lck(generic_block<Splitter>::ctrlMtx);
+            generic_block<Splitter>::tempStop();
             out.push_back(stream);
-            generic_block::registerOutput(stream);
-            generic_block::tempStart();
+            generic_block<Splitter>::registerOutput(stream);
+            generic_block<Splitter>::tempStart();
         }
 
         void unbindStream(stream<T>* stream) {
-            std::lock_guard<std::mutex> lck(ctrlMtx);
-            generic_block::tempStop();
-            generic_block::unregisterOutput(stream);
+            std::lock_guard<std::mutex> lck(generic_block<Splitter>::ctrlMtx);
+            generic_block<Splitter>::tempStop();
+            generic_block<Splitter>::unregisterOutput(stream);
             out.erase(std::remove(out.begin(), out.end(), stream), out.end());
-            generic_block::tempStart();
+            generic_block<Splitter>::tempStart();
         }
 
     private:

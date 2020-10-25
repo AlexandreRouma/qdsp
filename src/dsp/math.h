@@ -10,14 +10,14 @@ namespace dsp {
 
         Add(stream<T>* a, stream<T>* b) { init(a, b); }
 
-        ~Add() { stop(); }
+        ~Add() { generic_block<Add>::stop(); }
 
         void init(stream<T>* a, stream<T>* b) {
             _a = a;
             _b = b;
-            generic_block::registerInput(a);
-            generic_block::registerInput(b);
-            generic_block::registerOutput(&out);
+            generic_block<Add>::registerInput(a);
+            generic_block<Add>::registerInput(b);
+            generic_block<Add>::registerOutput(&out);
         }
 
         int run() {
@@ -41,6 +41,7 @@ namespace dsp {
             _a->flush();
             _b->flush();
             out.write(a_count);
+            return a_count;
         }
 
         stream<T> out;
@@ -59,14 +60,14 @@ namespace dsp {
 
         Multiply(stream<T>* a, stream<T>* b) { init(a, b); }
 
-        ~Multiply() { stop(); }
+        ~Multiply() { generic_block<Multiply>::stop(); }
 
         void init(stream<T>* a, stream<T>* b) {
             _a = a;
             _b = b;
-            generic_block::registerInput(a);
-            generic_block::registerInput(b);
-            generic_block::registerOutput(&out);
+            generic_block<Multiply>::registerInput(a);
+            generic_block<Multiply>::egisterInput(b);
+            generic_block<Multiply>::registerOutput(&out);
         }
 
         int run() {

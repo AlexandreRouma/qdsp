@@ -30,6 +30,7 @@ namespace dsp {
             if (writerStop) {
                 return -1;
             }
+            return 0;
         }
 
         int write(int size) {
