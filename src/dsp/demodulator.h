@@ -1,7 +1,7 @@
 #pragma once
 #include <dsp/block.h>
-
-#define FAST_ATAN2_COEF1 3.1415926535f / 4.0f
+#define PI -3.1415926535f
+#define FAST_ATAN2_COEF1 PI / 4.0f
 #define FAST_ATAN2_COEF2 3.0f * FAST_ATAN2_COEF1
 
 inline float fast_arctan2(float y, float x) {
@@ -49,7 +49,7 @@ namespace dsp {
             std::lock_guard<std::mutex> lck(generic_block<FMDemod>::ctrlMtx);
             generic_block<FMDemod>::tempStop();
             _sampleRate = sampleRate;
-            phasorSpeed = (2 * 3.1415926535) / (_sampleRate / _deviation);
+            phasorSpeed = (2 * PI) / (_sampleRate / _deviation);
             generic_block<FMDemod>::tempStart();
         }
 
@@ -61,7 +61,7 @@ namespace dsp {
             std::lock_guard<std::mutex> lck(generic_block<FMDemod>::ctrlMtx);
             generic_block<FMDemod>::tempStop();
             _deviation = deviation;
-            phasorSpeed = (2 * 3.1415926535) / (_sampleRate / _deviation);
+            phasorSpeed = (2 * PI) / (_sampleRate / _deviation);
             generic_block<FMDemod>::tempStart();
         }
 
@@ -76,11 +76,13 @@ namespace dsp {
             // This is somehow faster than volk...
 
             out.aquire();
+            float phasor = 1 / phasorSpeed;
             for (int i = 0; i < count; i++) {
+                float diff;
                 currentPhase = fast_arctan2(_in->data[i].i, _in->data[i].q);
                 diff = currentPhase - phase;
-                if (diff > 3.1415926535f)        { out.data[i] = (diff - 2 * 3.1415926535f) / phasorSpeed; }
-                else if (diff <= -3.1415926535f) { out.data[i] = (diff + 2 * 3.1415926535f) / phasorSpeed; }
+                if (diff > PI)        { out.data[i] = (diff - 2 * PI) * phasor; }
+                else if (diff <= -PI) { out.data[i] = (diff + 2 * PI) * phasor; }
             }
 
             _in->flush();
