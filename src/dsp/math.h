@@ -66,7 +66,7 @@ namespace dsp {
             _a = a;
             _b = b;
             generic_block<Multiply>::registerInput(a);
-            generic_block<Multiply>::egisterInput(b);
+            generic_block<Multiply>::registerInput(b);
             generic_block<Multiply>::registerOutput(&out);
         }
 
