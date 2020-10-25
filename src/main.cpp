@@ -9,6 +9,10 @@
 #include <chrono>
 #include <iostream>
 
+// Note: will have to use volk_32fc_s32f_power_spectrum_32f(); for the FFT dB calculation
+// use volk_32fc_s32fc_x2_rotator_32fc for the sine source
+// use volk_32f_s32f_32f_fm_detect_32f for FM demod
+
 int main() {
     printf("Hello World!\n");
 
@@ -28,6 +32,8 @@ int main() {
         } 
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start); 
+
+        
 
         double dur = duration.count();
         double sps = ((1000000.0 / dur) * 1000000000.0) / 1000000.0;
