@@ -1,8 +1,8 @@
 #pragma once
 #include <dsp/block.h>
 
-#define M_PI                3.1415926535f
-#define FAST_ATAN2_COEF1    M_PI / 4.0f
+#define FL_M_PI                3.1415926535f
+#define FAST_ATAN2_COEF1    FL_M_PI / 4.0f
 #define FAST_ATAN2_COEF2    3.0f * FAST_ATAN2_COEF1
 
 inline float fast_arctan2(float y, float x) {
@@ -50,7 +50,7 @@ namespace dsp {
             std::lock_guard<std::mutex> lck(generic_block<FMDemod>::ctrlMtx);
             generic_block<FMDemod>::tempStop();
             _sampleRate = sampleRate;
-            phasorSpeed = (2 * M_PI) / (_sampleRate / _deviation);
+            phasorSpeed = (2 * FL_M_PI) / (_sampleRate / _deviation);
             generic_block<FMDemod>::tempStart();
         }
 
@@ -62,7 +62,7 @@ namespace dsp {
             std::lock_guard<std::mutex> lck(generic_block<FMDemod>::ctrlMtx);
             generic_block<FMDemod>::tempStop();
             _deviation = deviation;
-            phasorSpeed = (2 * M_PI) / (_sampleRate / _deviation);
+            phasorSpeed = (2 * FL_M_PI) / (_sampleRate / _deviation);
             generic_block<FMDemod>::tempStart();
         }
 
@@ -80,8 +80,8 @@ namespace dsp {
             for (int i = 0; i < count; i++) {
                 currentPhase = fast_arctan2(_in->data[i].i, _in->data[i].q);
                 diff = currentPhase - phase;
-                if (diff > M_PI)        { out.data[i] = (diff - 2 * M_PI) / phasorSpeed; }
-                else if (diff <= -M_PI) { out.data[i] = (diff + 2 * M_PI) / phasorSpeed; }
+                if (diff > FL_M_PI)        { out.data[i] = (diff - 2 * FL_M_PI) / phasorSpeed; }
+                else if (diff <= -FL_M_PI) { out.data[i] = (diff + 2 * FL_M_PI) / phasorSpeed; }
             }
 
             _in->flush();

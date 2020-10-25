@@ -32,10 +32,10 @@ namespace dsp {
 
             out.aquire();
             if constexpr (std::is_same_v<T, complex_t> || std::is_same_v<T, stereo_t>) {
-                volk_32fc_x2_add_32fc(_a->data, _b->data, out.data, a_count);
+                volk_32fc_x2_add_32fc(out.data, _a->data, _b->data, a_count);
             }
             else {
-                volk_32f_x2_add_32f(_a->data, _b->data, out.data, a_count);
+                volk_32f_x2_add_32f(out.data, _a->data, _b->data, a_count);
             }
 
             _a->flush();
@@ -82,10 +82,10 @@ namespace dsp {
 
             out.aquire();
             if constexpr (std::is_same_v<T, complex_t>) {
-                volk_32fc_x2_multiply_32fc(_a->data, _b->data, out.data, a_count);
+                volk_32fc_x2_multiply_32fc(out.data, _a->data, _b->data, a_count);
             }
             else {
-                volk_32f_x2_multiply_32f(_a->data, _b->data, out.data, a_count);
+                volk_32f_x2_multiply_32f(out.data, _a->data, _b->data, a_count);
             }
 
             _a->flush();
