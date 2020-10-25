@@ -4,6 +4,7 @@
 #include <dsp/block.h>
 #include <dsp/routing.h>
 #include <dsp/math.h>
+#include <dsp/demodulator.h>
 #include <thread>
 #include <chrono>
 #include <iostream>
@@ -11,34 +12,27 @@
 int main() {
     printf("Hello World!\n");
 
-    dsp::stream<float> a_stream;
-    dsp::stream<float> b_stream;
-    dsp::stream<float> out_stream;
+    dsp::stream<dsp::complex_t> in_stream;
+    dsp::FMDemod demod(&in_stream, 1000000, 100000);
 
-    dsp::Add<float> adder(&a_stream, &b_stream);
-    dsp::Splitter<float> split(&adder.out);
-
-    split.bindStream(&out_stream);
-
-    adder.start();
-    split.start();
-
-    
+    demod.start();
 
     while(1) {
         auto start = std::chrono::high_resolution_clock::now();
         for (int i = 0; i < 1000; i++) {
-            a_stream.aquire();
-            a_stream.write(1000000);
-            b_stream.aquire();
-            b_stream.write(1000000);
-            out_stream.read();
-            out_stream.flush();
+            in_stream.aquire();
+            in_stream.write(1000000);
+            
+            demod.out.read();
+            demod.out.flush();
         } 
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start); 
+
+        double dur = duration.count();
+        double sps = ((1000000.0 / dur) * 1000000000.0) / 1000000.0;
   
-        std::cout << "Time taken by function: " << duration.count() << " microseconds" << std::endl; 
+        std::cout << "Speed: " << sps << " MS/s" << std::endl; 
     }
 
     printf("Returning!\n");
