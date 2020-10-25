@@ -11,7 +11,9 @@
 
 // Note: will have to use volk_32fc_s32f_power_spectrum_32f(); for the FFT dB calculation
 // use volk_32fc_s32fc_x2_rotator_32fc for the sine source
-// use volk_32f_s32f_32f_fm_detect_32f for FM demod
+// use volk_32f_s32f_32f_fm_detect_32f for FM demod (that's bad)
+// Fix argument order in volk add and multiply
+// add set inputs for adder and multiplier
 
 int main() {
     printf("Hello World!\n");
