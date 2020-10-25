@@ -15,9 +15,9 @@ namespace dsp {
         void init(stream<T>* a, stream<T>* b) {
             _a = a;
             _b = b;
-            registerInput(a);
-            registerInput(b);
-            registerOutput(&out);
+            generic_block::registerInput(a);
+            generic_block::registerInput(b);
+            generic_block::registerOutput(&out);
         }
 
         int run() {
@@ -64,9 +64,9 @@ namespace dsp {
         void init(stream<T>* a, stream<T>* b) {
             _a = a;
             _b = b;
-            registerInput(a);
-            registerInput(b);
-            registerOutput(&out);
+            generic_block::registerInput(a);
+            generic_block::registerInput(b);
+            generic_block::registerOutput(&out);
         }
 
         int run() {

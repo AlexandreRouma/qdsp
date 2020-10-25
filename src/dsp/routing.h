@@ -9,36 +9,36 @@ namespace dsp {
 
         Splitter(stream<T>* in) { init(in); }
 
-        ~Splitter() { stop(); }
+        ~Splitter() { generic_block::stop(); }
 
         void init(stream<T>* in) {
             _in = in;
-            registerInput(_in);
+            generic_block::registerInput(_in);
         }
 
         void setInput(stream<T>* in) {
             std::lock_guard<std::mutex> lck(ctrlMtx);
-            tempStop();
-            unregisterInput(_in);
+            generic_block::tempStop();
+            generic_block::unregisterInput(_in);
             _in = in;
-            registerInput(_in);
-            tempStart();
+            generic_block::registerInput(_in);
+            generic_block::tempStart();
         }
 
         void bindStream(stream<T>* stream) {
             std::lock_guard<std::mutex> lck(ctrlMtx);
-            tempStop();
+            generic_block::tempStop();
             out.push_back(stream);
-            registerOutput(stream);
-            tempStart();
+            generic_block::registerOutput(stream);
+            generic_block::tempStart();
         }
 
         void unbindStream(stream<T>* stream) {
             std::lock_guard<std::mutex> lck(ctrlMtx);
-            tempStop();
-            unregisterOutput(stream);
+            generic_block::tempStop();
+            generic_block::unregisterOutput(stream);
             out.erase(std::remove(out.begin(), out.end(), stream), out.end());
-            tempStart();
+            generic_block::tempStart();
         }
 
     private:
