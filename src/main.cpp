@@ -8,6 +8,7 @@
 #include <thread>
 #include <chrono>
 #include <iostream>
+#include <random>
 
 // Note: will have to use volk_32fc_s32f_power_spectrum_32f(); for the FFT dB calculation
 // use volk_32fc_s32fc_x2_rotator_32fc for the sine source
@@ -20,10 +21,17 @@ int main() {
 
     dsp::stream<dsp::complex_t> in_stream;
     dsp::FMDemod demod(&in_stream, 1000000, 100000);
+    
+    for (int i = 0; i < 1000000; i++) {
+        in_stream.data[i].i = float(rand())/float((RAND_MAX)) - 1.0f;;
+        in_stream.data[i].q = float(rand())/float((RAND_MAX)) - 1.0f;;
+    }
 
     demod.start();
 
-    while(1) {
+    float speed = 0.0f;
+
+    for (int r = 0; r < 10; r++) {
         auto start = std::chrono::high_resolution_clock::now();
         for (int i = 0; i < 1000; i++) {
             in_stream.aquire();
@@ -35,13 +43,11 @@ int main() {
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start); 
 
-        
-
-        double dur = duration.count();
-        double sps = ((1000000.0 / dur) * 1000000000.0) / 1000000.0;
-  
-        std::cout << "Speed: " << sps << " MS/s" << std::endl; 
+        speed += ((1000000.0 / duration.count()) * 1000000000.0) / 1000000.0;
+        std::cout << "Round " << r << std::endl;
     }
+
+    std::cout << "Average Speed: " << (speed/10.0f) << " MS/s" << std::endl;
 
     printf("Returning!\n");
 
