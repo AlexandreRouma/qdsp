@@ -50,7 +50,7 @@ namespace dsp {
             std::lock_guard<std::mutex> lck(generic_block<FMDemod>::ctrlMtx);
             generic_block<FMDemod>::tempStop();
             _sampleRate = sampleRate;
-            phasorSpeed = (2 * FL_M_PI) / (_sampleRate / _deviation);
+            phasorSpeed = (_sampleRate / _deviation) / (2 * FL_M_PI);
             generic_block<FMDemod>::tempStart();
         }
 
@@ -62,7 +62,7 @@ namespace dsp {
             std::lock_guard<std::mutex> lck(generic_block<FMDemod>::ctrlMtx);
             generic_block<FMDemod>::tempStop();
             _deviation = deviation;
-            phasorSpeed = (2 * FL_M_PI) / (_sampleRate / _deviation);
+            phasorSpeed = (_sampleRate / _deviation) / (2 * FL_M_PI);
             generic_block<FMDemod>::tempStart();
         }
 
@@ -76,12 +76,15 @@ namespace dsp {
 
             // This is somehow faster than volk...
 
+            float diff, currentPhase;
+
             out.aquire();
             for (int i = 0; i < count; i++) {
                 currentPhase = fast_arctan2(_in->data[i].i, _in->data[i].q);
                 diff = currentPhase - phase;
-                if (diff > FL_M_PI)        { out.data[i] = (diff - 2 * FL_M_PI) / phasorSpeed; }
-                else if (diff <= -FL_M_PI) { out.data[i] = (diff + 2 * FL_M_PI) / phasorSpeed; }
+                if (diff > FL_M_PI)        { out.data[i] = (diff - 2 * FL_M_PI) * phasorSpeed; }
+                else if (diff <= -FL_M_PI) { out.data[i] = (diff + 2 * FL_M_PI) * phasorSpeed; }
+                phase = currentPhase;
             }
 
             _in->flush();
@@ -93,7 +96,7 @@ namespace dsp {
 
     private:
         int count;
-        float currentPhase, diff, phase, phasorSpeed, _sampleRate, _deviation;
+        float phase, phasorSpeed, _sampleRate, _deviation;
         stream<complex_t>* _in;
 
     };
