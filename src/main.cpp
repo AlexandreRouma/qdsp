@@ -23,7 +23,7 @@ int main() {
     const int ROUNDS = 1;
 
     dsp::stream<dsp::complex_t> in_stream;
-    dsp::PolyphaseFIR<32> demod(&in_stream, 1000000, 500000, 10000);
+    dsp::FIR demod(&in_stream, 200000, 100000, 100000);
 
     for (int i = 0; i < 1000000; i++) {
         in_stream.data[i].i = float(rand())/float((RAND_MAX)) - 1.0f;;

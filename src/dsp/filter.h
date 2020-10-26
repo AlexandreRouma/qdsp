@@ -50,93 +50,82 @@ namespace dsp {
         return tapCount;
     }
 
-    template <int ORDER>
-    class PolyphaseFIR : public generic_block<PolyphaseFIR<ORDER>> {
+    class FIR : public generic_block<FIR> {
     public:
-        PolyphaseFIR() {}
+        FIR() {}
 
-        PolyphaseFIR(stream<complex_t>* in, float sampleRate, float cutoff, float transWidth) { init(in, sampleRate, cutoff, transWidth); }
+        FIR(stream<complex_t>* in, float sampleRate, float cutoff, float transWidth) { init(in, sampleRate, cutoff, transWidth); }
 
-        ~PolyphaseFIR() { generic_block<PolyphaseFIR<ORDER>>::stop(); }
+        ~FIR() { generic_block<FIR>::stop(); }
 
         void init(stream<complex_t>* in, float sampleRate, float cutoff, float transWidth) {
             _in = in;
             _sampleRate = sampleRate;
             _cutoff = cutoff;
             _transWidth = _transWidth;
-            tapCount = blackman_window(&fullTaps, sampleRate, cutoff, transWidth);
-
-            tapCountLow = tapCount / ORDER;
-            tapCountHigh = tapCountLow + 1;
-            tapSwitchPoint = tapCount % ORDER;
-
-            for (int i = 0; i < ORDER; i++) {
-                buffer[i] = (complex_t*)volk_malloc((STREAM_BUFFER_SIZE / ORDER) * sizeof(complex_t) * 2, volk_get_alignment());
-                outBuffer[i] = (complex_t*)volk_malloc((STREAM_BUFFER_SIZE / ORDER) * sizeof(complex_t) * 2, volk_get_alignment());
-                taps[i] = (float*)volk_malloc(tapCountHigh * sizeof(float), volk_get_alignment());
-            }
-
-            generic_block<PolyphaseFIR<ORDER>>::registerInput(_in);
-            generic_block<PolyphaseFIR<ORDER>>::registerOutput(&out);
+            tapCount = blackman_window(&taps, sampleRate, cutoff, transWidth);
+            buffer = (complex_t*)volk_malloc(STREAM_BUFFER_SIZE * sizeof(complex_t) * 2, volk_get_alignment());
+            bufStart = &buffer[tapCount];
+            generic_block<FIR>::registerInput(_in);
+            generic_block<FIR>::registerOutput(&out);
         }
 
         void setInput(stream<complex_t>* in) {
-            std::lock_guard<std::mutex> lck(generic_block<PolyphaseFIR<ORDER>>::ctrlMtx);
-            generic_block<PolyphaseFIR<ORDER>>::tempStop();
+            std::lock_guard<std::mutex> lck(generic_block<FIR>::ctrlMtx);
+            generic_block<FIR>::tempStop();
             _in = in;
-            generic_block<PolyphaseFIR<ORDER>>::tempStart();
+            generic_block<FIR>::tempStart();
+        }
+
+        void setSampleRate(float sampleRate) {
+            std::lock_guard<std::mutex> lck(generic_block<FIR>::ctrlMtx);
+            generic_block<FIR>::tempStop();
+            _sampleRate = sampleRate;
+            updateTaps();
+            generic_block<FIR>::tempStart();
+        }
+
+        float getSampleRate() {
+            return _sampleRate;
+        }
+
+        void setCutoff(float cutoff) {
+            std::lock_guard<std::mutex> lck(generic_block<FIR>::ctrlMtx);
+            generic_block<FIR>::tempStop();
+            _cutoff = cutoff;
+            updateTaps();
+            generic_block<FIR>::tempStart();
+        }
+
+        float getCutoff() {
+            return _cutoff;
+        }
+
+        void setTransWidth(float transWidth) {
+            std::lock_guard<std::mutex> lck(generic_block<FIR>::ctrlMtx);
+            generic_block<FIR>::tempStop();
+            _transWidth = transWidth;
+            updateTaps();
+            generic_block<FIR>::tempStart();
+        }
+
+        float getTransWidth() {
+            return _transWidth;
         }
 
         int run() {
             count = _in->read();
             if (count < 0) { return -1; }
 
-            int lowCount = count / ORDER;
-            int highCount = lowCount + 1;
-            int switchPoint = count % ORDER;
-
-            // Read data into delay buffers
-            for (int i = 0; i < count; i++) {
-                buffer[i % ORDER][(i / ORDER) + tapCount] = _in->data[i];
-            }
+            memcpy(bufStart, _in->data, count * sizeof(complex_t));
             _in->flush();
-
-            // Process through FIR
-            for (int i = 0; i < ORDER; i++) {
-                if (i < switchPoint) {
-                    if (i < tapSwitchPoint) {
-                        do_fir(&buffer[i][tapCount], taps[i], outBuffer[i], highCount, tapCountHigh);
-                    }
-                    else {
-                        do_fir(&buffer[i][tapCount], taps[i], outBuffer[i], highCount, tapCountLow);
-                    }
-                }
-                else {
-                    if (i < tapSwitchPoint) {
-                        do_fir(&buffer[i][tapCount], taps[i], outBuffer[i], lowCount, tapCountHigh);
-                    }
-                    else {
-                        do_fir(&buffer[i][tapCount], taps[i], outBuffer[i], lowCount, tapCountLow);
-                    }
-                }
-            }
-
-            // Save end of the data
-            for (int i = 0; i < ORDER; i++) {
-                if (i < switchPoint) {
-                    memmove(buffer[i], &buffer[i][highCount], tapCount * sizeof(complex_t));
-                }
-                else {
-                    memmove(buffer[i], &buffer[i][lowCount], tapCount * sizeof(complex_t));
-                }
-            }
 
             // Write to output
             out.aquire();
-            for (int i = 0; i < count; i++) {
-                out.data[i] = outBuffer[i % ORDER][(i / ORDER)];
-            }
+            do_fir(bufStart, taps, out.data, count, tapCount);
             out.write(count);
+
+            memcpy(buffer, &buffer[count], tapCount);
 
             return count;
         }
@@ -144,19 +133,20 @@ namespace dsp {
         stream<complex_t> out;
 
     private:
+        void updateTaps() {
+            volk_free(taps);
+            tapCount = blackman_window(&taps, _sampleRate, _cutoff, _transWidth);
+            bufStart = &buffer[tapCount];
+        }
+
         int count;
         float _sampleRate, _cutoff, _transWidth;
         stream<complex_t>* _in;
 
-        complex_t* buffer[ORDER];
-        complex_t* outBuffer[ORDER];
-        float* fullTaps;
-        float* taps[ORDER];
-
+        complex_t* bufStart;
+        complex_t* buffer;
         int tapCount;
-        int tapCountLow;
-        int tapCountHigh;
-        int tapSwitchPoint;
+        float* taps;
 
     };
 }
