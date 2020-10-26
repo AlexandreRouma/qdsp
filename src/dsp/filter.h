@@ -125,7 +125,7 @@ namespace dsp {
             do_fir(bufStart, taps, out.data, count, tapCount);
             out.write(count);
 
-            memcpy(buffer, &buffer[count], tapCount);
+            memmove(buffer, &buffer[count], tapCount);
 
             return count;
         }
