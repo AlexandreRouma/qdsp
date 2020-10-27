@@ -3,7 +3,7 @@
 #include <condition_variable>
 #include <volk/volk.h>
 
-// 1MB buffer
+// 1M Values Buffer
 #define STREAM_BUFFER_SIZE  1000000
 
 namespace dsp {
@@ -24,7 +24,8 @@ namespace dsp {
         stream() {
             data = (T*)volk_malloc(STREAM_BUFFER_SIZE * sizeof(T), volk_get_alignment());
         }
-
+        
+        //Open stream for writing
         int aquire() {
             waitReady();
             if (writerStop) {
@@ -32,7 +33,8 @@ namespace dsp {
             }
             return 0;
         }
-
+        
+        //Writing {size} values done, close stream for writing
         int write(int size) {
             std::lock_guard<std::mutex> lck(sigMtx);
             contentSize = size;
@@ -40,7 +42,8 @@ namespace dsp {
             cv.notify_all();
             return 0;
         }
-
+        
+        //Try to read data available in buffer
         int read() {
             waitData();
             if (readerStop) {
@@ -48,7 +51,8 @@ namespace dsp {
             }
             return contentSize;
         }
-
+        
+        //Reading done
         void flush() {
             std::lock_guard<std::mutex> lck(sigMtx);
             dataReady = false;
