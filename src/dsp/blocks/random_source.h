@@ -3,7 +3,7 @@
 #include <volk/volk.h>
 #include <random>
 
-//Beta SoapySDR Source block
+//Random Source block
 
 namespace dsp {
     template <class T>
