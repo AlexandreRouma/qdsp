@@ -30,8 +30,8 @@ namespace dsp {
         float sum = 0.0f;
         float val;
         for (int i = 0; i < tapCount; i++) {
-            val = (sin(2.0f * FL_M_PI * fc * ((float)i - (tapCount / 2))) / ((float)i - (tapCount / 2))) * 
-                (0.42f - (0.5f * cos(2.0f * FL_M_PI / tapCount)) + (0.8f * cos(4.0f * FL_M_PI / tapCount)));
+            val = (sin(2.0f * FL_M_PI * fc * ((float)i - ((float)tapCount / 2))) / ((float)i - ((float)tapCount / 2))) * 
+                (0.42f - (0.5f * cos(2.0f * FL_M_PI / (float)tapCount)) + (0.8f * cos(4.0f * FL_M_PI / (float)tapCount)));
             _taps[i] = val;
             sum += val;
         }
