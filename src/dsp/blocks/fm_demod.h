@@ -35,6 +35,7 @@ namespace dsp {
             _in = in;
             _sampleRate = sampleRate;
             _deviation = deviation;
+            phasorSpeed = (_sampleRate / _deviation) / (2 * FL_M_PI);
             generic_block<FMDemod>::registerInput(_in);
             generic_block<FMDemod>::registerOutput(&out);
         }
