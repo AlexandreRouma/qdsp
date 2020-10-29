@@ -374,7 +374,9 @@ namespace dsp {
                 nitems = ret;
             else {
                 out.write(0);
-                return ret; //If error occured
+                if(ret != -4) //Overflow is ok
+                    return ret; //If error occured
+                return 0;
             }
             out.write(nitems);
             return nitems;
