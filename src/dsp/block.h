@@ -10,6 +10,7 @@
 
 namespace dsp {
     
+    //Generic block, has inputs and outputs
     template <class BLOCK>
     class generic_block {
     public:
@@ -102,6 +103,96 @@ namespace dsp {
         }
 
         std::vector<untyped_steam*> inputs;
+        std::vector<untyped_steam*> outputs;
+
+        bool running = false;
+        bool tempStopped = false;
+
+        std::thread workerThread;
+
+    protected:
+        std::mutex ctrlMtx;
+
+    };
+    
+    //Source block, same as generic, just without inputs
+    template <class BLOCK>
+    class source_block {
+    public:
+        virtual void init() {}
+
+        virtual void start() {
+            std::lock_guard<std::mutex> lck(ctrlMtx);
+            if (running) {
+                return;
+            }
+            doStart();
+        }
+
+        virtual void stop() {
+            std::lock_guard<std::mutex> lck(ctrlMtx);
+            if (!running) {
+                return;
+            }
+            doStop();
+        }
+
+        virtual int calcOutSize(int inSize) { return -1; }
+
+        virtual int run() = 0;
+        
+        friend BLOCK;
+
+    private:
+        void workerLoop() { 
+            while (run() >= 0);
+        }
+
+        void aquire() {
+            ctrlMtx.lock();
+        }
+
+        void release() {
+            ctrlMtx.unlock();
+        }
+
+        void registerOutput(untyped_steam* outStream) {
+            outputs.push_back(outStream);
+        }
+
+        void unregisterOutput(untyped_steam* outStream) {
+            outputs.erase(std::remove(outputs.begin(), outputs.end(), outStream), outputs.end());
+        }
+
+        void doStart() {
+            running = true;
+            workerThread = std::thread(&source_block::workerLoop, this);
+        }
+
+        void doStop() {
+            for (auto const& out : outputs) {
+                out->stopWriter();
+            }
+            workerThread.join();
+            for (auto const& out : outputs) {
+                out->clearWriteStop();
+            }
+        }
+
+        void tempStart() {
+            if (tempStopped) {
+                doStart();
+                tempStopped = false;
+            }
+        }
+
+        void tempStop() {
+            if (running) {
+                doStop();
+                tempStopped = true;
+            }
+        }
+
         std::vector<untyped_steam*> outputs;
 
         bool running = false;

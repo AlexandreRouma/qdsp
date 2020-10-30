@@ -30,8 +30,8 @@ namespace dsp {
         float sum = 0.0f;
         float val;
         for (int i = 0; i < tapCount; i++) {
-            val = (sin(2.0f * FL_M_PI * fc * ((float)i - (tapCount / 2))) / ((float)i - (tapCount / 2))) * 
-                (0.42f - (0.5f * cos(2.0f * FL_M_PI / tapCount)) + (0.8f * cos(4.0f * FL_M_PI / tapCount)));
+            val = (sin(2.0f * FL_M_PI * fc * ((float)i - ((float)tapCount / 2))) / ((float)i - ((float)tapCount / 2))) * 
+                (0.42f - (0.5f * cos(2.0f * FL_M_PI / (float)tapCount)) + (0.8f * cos(4.0f * FL_M_PI / (float)tapCount)));
             _taps[i] = val;
             sum += val;
         }
@@ -50,13 +50,13 @@ namespace dsp {
         return tapCount;
     }
 
-    class FIR : public generic_block<FIR> {
+    class FIRFilter : public generic_block<FIRFilter> {
     public:
-        FIR() {}
+        FIRFilter() {}
 
-        FIR(stream<complex_t>* in, float sampleRate, float cutoff, float transWidth) { init(in, sampleRate, cutoff, transWidth); }
+        FIRFilter(stream<complex_t>* in, float sampleRate, float cutoff, float transWidth) { init(in, sampleRate, cutoff, transWidth); }
 
-        ~FIR() { generic_block<FIR>::stop(); }
+        ~FIRFilter() { generic_block<FIRFilter>::stop(); }
 
         void init(stream<complex_t>* in, float sampleRate, float cutoff, float transWidth) {
             _in = in;
@@ -66,23 +66,23 @@ namespace dsp {
             tapCount = blackman_window(&taps, sampleRate, cutoff, transWidth);
             buffer = (complex_t*)volk_malloc(STREAM_BUFFER_SIZE * sizeof(complex_t) * 2, volk_get_alignment());
             bufStart = &buffer[tapCount];
-            generic_block<FIR>::registerInput(_in);
-            generic_block<FIR>::registerOutput(&out);
+            generic_block<FIRFilter>::registerInput(_in);
+            generic_block<FIRFilter>::registerOutput(&out);
         }
 
         void setInput(stream<complex_t>* in) {
-            std::lock_guard<std::mutex> lck(generic_block<FIR>::ctrlMtx);
-            generic_block<FIR>::tempStop();
+            std::lock_guard<std::mutex> lck(generic_block<FIRFilter>::ctrlMtx);
+            generic_block<FIRFilter>::tempStop();
             _in = in;
-            generic_block<FIR>::tempStart();
+            generic_block<FIRFilter>::tempStart();
         }
 
         void setSampleRate(float sampleRate) {
-            std::lock_guard<std::mutex> lck(generic_block<FIR>::ctrlMtx);
-            generic_block<FIR>::tempStop();
+            std::lock_guard<std::mutex> lck(generic_block<FIRFilter>::ctrlMtx);
+            generic_block<FIRFilter>::tempStop();
             _sampleRate = sampleRate;
             updateTaps();
-            generic_block<FIR>::tempStart();
+            generic_block<FIRFilter>::tempStart();
         }
 
         float getSampleRate() {
@@ -90,11 +90,11 @@ namespace dsp {
         }
 
         void setCutoff(float cutoff) {
-            std::lock_guard<std::mutex> lck(generic_block<FIR>::ctrlMtx);
-            generic_block<FIR>::tempStop();
+            std::lock_guard<std::mutex> lck(generic_block<FIRFilter>::ctrlMtx);
+            generic_block<FIRFilter>::tempStop();
             _cutoff = cutoff;
             updateTaps();
-            generic_block<FIR>::tempStart();
+            generic_block<FIRFilter>::tempStart();
         }
 
         float getCutoff() {
@@ -102,11 +102,11 @@ namespace dsp {
         }
 
         void setTransWidth(float transWidth) {
-            std::lock_guard<std::mutex> lck(generic_block<FIR>::ctrlMtx);
-            generic_block<FIR>::tempStop();
+            std::lock_guard<std::mutex> lck(generic_block<FIRFilter>::ctrlMtx);
+            generic_block<FIRFilter>::tempStop();
             _transWidth = transWidth;
             updateTaps();
-            generic_block<FIR>::tempStart();
+            generic_block<FIRFilter>::tempStart();
         }
 
         float getTransWidth() {
