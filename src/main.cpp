@@ -31,13 +31,13 @@ int main() {
     dsp::stream<float> inputStream;
 
     dsp::filter_window::BlackmanWindow win(1000, 100, 6000);
-    dsp::FIR<float> resamp(&inputStream, &win);//, 6000, 48000);
-    win.setSampleRate(6000);// * resamp.getInterpolation());
+    dsp::PolyphaseResampler<float> resamp(&inputStream, &win, 6000, 48000);
+    win.setSampleRate(6000 * resamp.getInterpolation());
     resamp.updateWindow(&win);
 
     resamp.start();
     
-    WavWriter wavWriter("output.wav", 16, 1, 6000);
+    WavWriter wavWriter("output.wav", 16, 1, 48000);
     // ===================
 
 
