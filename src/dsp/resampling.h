@@ -109,6 +109,7 @@ namespace dsp {
 
             // Write to output
             int outIndex = 0;
+            int _interp_m_1 = _interp - 1;
             if constexpr (std::is_same_v<T, float>) {
                 for (int i = 0; outIndex < outCount; i += _decim) {
                     int phase = i % _interp;
@@ -155,10 +156,10 @@ namespace dsp {
             for(int tap = 0; tap < tapsPerPhase; tap++) {
                 for (int phase = 0; phase < phases; phase++) {
                     if(currentTap < tapCount) {
-                        tapPhases[phase][tap] = taps[currentTap++];
+                        tapPhases[(_interp - 1) - phase][tap] = taps[currentTap++];
                     }
                     else{
-                        tapPhases[phase][tap] = 0;
+                        tapPhases[(_interp - 1) - phase][tap] = 0;
                     }
                 }
             }

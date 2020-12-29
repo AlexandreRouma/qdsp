@@ -35,10 +35,13 @@ int main() {
     win.setSampleRate(6000 * resamp.getInterpolation());
     resamp.updateWindow(&win);
 
+    //dsp::NullSink<float> ns(&resamp.out);
+
     resamp.start();
+    //ns.start();
     
     WavWriter wavWriter("output.wav", 16, 1, 48000);
-    // ===================
+    //===================
 
 
     // Write to input
@@ -56,12 +59,12 @@ int main() {
 
     
 
-    count = win.getTapCount();
-    float* taps = new float[count];
-    win.createTaps(taps, count);
-    for (int i = 0; i < count; i++) {
-        printf("%f\n", taps[i]);
-    }
+    // count = win.getTapCount();
+    // float* taps = new float[count];
+    // win.createTaps(taps, count);
+    // for (int i = 0; i < count; i++) {
+    //     printf("%f\n", taps[i]);
+    // }
 
 
 
