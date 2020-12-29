@@ -6,6 +6,8 @@
 #include <vector>
 #include <algorithm>
 
+#include <spdlog/spdlog.h>
+
 #define FL_M_PI                3.1415926535f
 
 namespace dsp {
@@ -15,11 +17,16 @@ namespace dsp {
     public:
         virtual void init() {}
 
+        virtual ~generic_block() {
+            stop();
+        }
+
         virtual void start() {
             std::lock_guard<std::mutex> lck(ctrlMtx);
             if (running) {
                 return;
             }
+            running = true;
             doStart();
         }
 
@@ -29,9 +36,10 @@ namespace dsp {
                 return;
             }
             doStop();
+            running = false;
         }
 
-        virtual int calcOutSize(int inSize) { return -1; }
+        virtual int calcOutSize(int inSize) { return inSize; }
 
         virtual int run() = 0;
         
@@ -66,23 +74,27 @@ namespace dsp {
             outputs.erase(std::remove(outputs.begin(), outputs.end(), outStream), outputs.end());
         }
 
-        void doStart() {
-            running = true;
-            workerThread = std::thread(&generic_block::workerLoop, this);
+        virtual void doStart() {
+            workerThread = std::thread(&generic_block<BLOCK>::workerLoop, this);
         }
 
-        void doStop() {
-            for (auto const& in : inputs) {
+        virtual void doStop() {
+            for (auto& in : inputs) {
                 in->stopReader();
             }
-            for (auto const& out : outputs) {
+            for (auto& out : outputs) {
                 out->stopWriter();
             }
-            workerThread.join();
-            for (auto const& in : inputs) {
+
+            // TODO: Make sure this isn't needed, I don't know why it stops
+            if (workerThread.joinable()) {
+                workerThread.join();
+            }
+
+            for (auto& in : inputs) {
                 in->clearReadStop();
             }
-            for (auto const& out : outputs) {
+            for (auto& out : outputs) {
                 out->clearWriteStop();
             }
         }
@@ -95,7 +107,7 @@ namespace dsp {
         }
 
         void tempStop() {
-            if (running) {
+            if (running && !tempStopped) {
                 doStop();
                 tempStopped = true;
             }

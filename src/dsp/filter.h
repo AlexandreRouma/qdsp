@@ -1,152 +1,168 @@
 #pragma once
 #include <dsp/block.h>
+#include <dsp/window.h>
+#include <string.h>
 
 namespace dsp {
 
-    void do_fir(complex_t* start, float* taps, complex_t* out, int dataCount, int tapCount) {
-        int offset = tapCount - 1;
-        for (int i = 0; i < dataCount; i++) {
-            volk_32fc_32f_dot_prod_32fc((lv_32fc_t*)&out[i], (lv_32fc_t*)&start[i - offset], taps, tapCount);
-        }
-    }
-
-    int blackman_window(float** taps, float sampleRate, float cutoff, float transWidth) {
-        // Calculate tap count
-        float fc = cutoff / sampleRate;
-        if (fc > 1.0f) {
-            fc = 1.0f;
-        }
-        int tapCount = 4.0f / (transWidth / sampleRate);
-        if (tapCount < 4) {
-            tapCount = 4;
-        }
-        if (tapCount % 2 == 0) { tapCount++; }
-
-        // Allocate taps
-        *taps = (float*)volk_malloc(tapCount * sizeof(float), volk_get_alignment());
-        float* _taps = (float*)malloc(tapCount * sizeof(float));
-
-        // Calculate and normalize taps
-        float sum = 0.0f;
-        float val;
-        for (int i = 0; i < tapCount; i++) {
-            val = (sin(2.0f * FL_M_PI * fc * ((float)i - (tapCount / 2))) / ((float)i - (tapCount / 2))) * 
-                (0.42f - (0.5f * cos(2.0f * FL_M_PI / tapCount)) + (0.8f * cos(4.0f * FL_M_PI / tapCount)));
-            _taps[i] = val;
-            sum += val;
-        }
-        for (int i = 0; i < tapCount; i++) {
-            _taps[i] /= sum;
-        }
-
-        // Flip taps
-        float* flipped = *taps;
-        for (int i = 0; i < tapCount; i++) {
-            flipped[i] = _taps[tapCount - i - 1];
-        }
-
-        free(_taps);
-
-        return tapCount;
-    }
-
-    class FIR : public generic_block<FIR> {
+    template <class T>
+    class FIR : public generic_block<FIR<T>> {
     public:
         FIR() {}
 
-        FIR(stream<complex_t>* in, float sampleRate, float cutoff, float transWidth) { init(in, sampleRate, cutoff, transWidth); }
+        FIR(stream<T>* in, dsp::filter_window::generic_window* window) { init(in, window); }
 
-        ~FIR() { generic_block<FIR>::stop(); }
+        ~FIR() {
+            generic_block<FIR<T>>::stop();
+            volk_free(buffer);
+            volk_free(taps);
+        }
 
-        void init(stream<complex_t>* in, float sampleRate, float cutoff, float transWidth) {
+        void init(stream<T>* in, dsp::filter_window::generic_window* window) {
             _in = in;
-            _sampleRate = sampleRate;
-            _cutoff = cutoff;
-            _transWidth = _transWidth;
-            tapCount = blackman_window(&taps, sampleRate, cutoff, transWidth);
-            buffer = (complex_t*)volk_malloc(STREAM_BUFFER_SIZE * sizeof(complex_t) * 2, volk_get_alignment());
+
+            tapCount = window->getTapCount();
+            taps = (float*)volk_malloc(tapCount * sizeof(float), volk_get_alignment());
+            window->createTaps(taps, tapCount);
+
+            buffer = (T*)volk_malloc(STREAM_BUFFER_SIZE * sizeof(T) * 2, volk_get_alignment());
             bufStart = &buffer[tapCount];
-            generic_block<FIR>::registerInput(_in);
-            generic_block<FIR>::registerOutput(&out);
+            generic_block<FIR<T>>::registerInput(_in);
+            generic_block<FIR<T>>::registerOutput(&out);
         }
 
-        void setInput(stream<complex_t>* in) {
-            std::lock_guard<std::mutex> lck(generic_block<FIR>::ctrlMtx);
-            generic_block<FIR>::tempStop();
+        void setInput(stream<T>* in) {
+            std::lock_guard<std::mutex> lck(generic_block<FIR<T>>::ctrlMtx);
+            generic_block<FIR<T>>::tempStop();
+            generic_block<FIR<T>>::unregisterInput(_in);
             _in = in;
-            generic_block<FIR>::tempStart();
+            generic_block<FIR<T>>::registerInput(_in);
+            generic_block<FIR<T>>::tempStart();
         }
 
-        void setSampleRate(float sampleRate) {
-            std::lock_guard<std::mutex> lck(generic_block<FIR>::ctrlMtx);
-            generic_block<FIR>::tempStop();
-            _sampleRate = sampleRate;
-            updateTaps();
-            generic_block<FIR>::tempStart();
-        }
-
-        float getSampleRate() {
-            return _sampleRate;
-        }
-
-        void setCutoff(float cutoff) {
-            std::lock_guard<std::mutex> lck(generic_block<FIR>::ctrlMtx);
-            generic_block<FIR>::tempStop();
-            _cutoff = cutoff;
-            updateTaps();
-            generic_block<FIR>::tempStart();
-        }
-
-        float getCutoff() {
-            return _cutoff;
-        }
-
-        void setTransWidth(float transWidth) {
-            std::lock_guard<std::mutex> lck(generic_block<FIR>::ctrlMtx);
-            generic_block<FIR>::tempStop();
-            _transWidth = transWidth;
-            updateTaps();
-            generic_block<FIR>::tempStart();
-        }
-
-        float getTransWidth() {
-            return _transWidth;
+        void updateWindow(dsp::filter_window::generic_window* window) {
+            _window = window;
+            volk_free(taps);
+            tapCount = window->getTapCount();
+            taps = (float*)volk_malloc(tapCount * sizeof(float), volk_get_alignment());
+            window->createTaps(taps, tapCount);
         }
 
         int run() {
             count = _in->read();
             if (count < 0) { return -1; }
 
-            memcpy(bufStart, _in->data, count * sizeof(complex_t));
+            memcpy(bufStart, _in->readBuf, count * sizeof(T));
             _in->flush();
 
-            // Write to output
-            out.aquire();
-            do_fir(bufStart, taps, out.data, count, tapCount);
-            out.write(count);
+            if constexpr (std::is_same_v<T, float>) {
+                for (int i = 0; i < count; i++) {
+                    volk_32f_x2_dot_prod_32f((float*)&out.writeBuf[i], (float*)&buffer[i+1], taps, tapCount);
+                }
+            }
+            if constexpr (std::is_same_v<T, complex_t>) {
+                for (int i = 0; i < count; i++) {
+                    volk_32fc_32f_dot_prod_32fc((lv_32fc_t*)&out.writeBuf[i], (lv_32fc_t*)&buffer[i+1], taps, tapCount);
+                }
+            }
 
-            memmove(buffer, &buffer[count], tapCount);
+            if (!out.swap(count)) { return -1; }
+
+            memmove(buffer, &buffer[count], tapCount * sizeof(T));
 
             return count;
         }
 
-        stream<complex_t> out;
+        stream<T> out;
 
     private:
-        void updateTaps() {
-            volk_free(taps);
-            tapCount = blackman_window(&taps, _sampleRate, _cutoff, _transWidth);
-            bufStart = &buffer[tapCount];
-        }
-
         int count;
-        float _sampleRate, _cutoff, _transWidth;
-        stream<complex_t>* _in;
+        stream<T>* _in;
 
-        complex_t* bufStart;
-        complex_t* buffer;
+        dsp::filter_window::generic_window* _window;
+
+        T* bufStart;
+        T* buffer;
         int tapCount;
         float* taps;
+
+    };
+
+    class BFMDeemp : public generic_block<BFMDeemp> {
+    public:
+        BFMDeemp() {}
+
+        BFMDeemp(stream<float>* in, float sampleRate, float tau) { init(in, sampleRate, tau); }
+
+        ~BFMDeemp() { generic_block<BFMDeemp>::stop(); }
+
+        void init(stream<float>* in, float sampleRate, float tau) {
+            _in = in;
+            _sampleRate = sampleRate;
+            _tau = tau;
+            float dt = 1.0f / _sampleRate;
+            alpha = dt / (_tau + dt);
+            generic_block<BFMDeemp>::registerInput(_in);
+            generic_block<BFMDeemp>::registerOutput(&out);
+        }
+
+        void setInput(stream<float>* in) {
+            std::lock_guard<std::mutex> lck(generic_block<BFMDeemp>::ctrlMtx);
+            generic_block<BFMDeemp>::tempStop();
+            generic_block<BFMDeemp>::unregisterInput(_in);
+            _in = in;
+            generic_block<BFMDeemp>::registerInput(_in);
+            generic_block<BFMDeemp>::tempStart();
+        }
+
+        void setSampleRate(float sampleRate) {
+            _sampleRate = sampleRate;
+            float dt = 1.0f / _sampleRate;
+            alpha = dt / (_tau + dt);
+        }
+
+        void setTau(float tau) {
+            _tau = tau;
+            float dt = 1.0f / _sampleRate;
+            alpha = dt / (_tau + dt);
+        }
+
+        int run() {
+            count = _in->read();
+            if (count < 0) { return -1; }
+
+            if (bypass) {
+                memcpy(out.writeBuf, _in->readBuf, count * sizeof(float));
+                _in->flush();
+                if (!out.swap(count)) { return -1; }
+                return count;
+            }
+
+            if (isnan(lastOut)) {
+                lastOut = 0.0f;
+            }
+            out.writeBuf[0] = (alpha * _in->readBuf[0]) + ((1-alpha) * lastOut);
+            for (int i = 1; i < count; i++) {
+                out.writeBuf[i] = (alpha * _in->readBuf[i]) + ((1 - alpha) * out.writeBuf[i - 1]);
+            }
+            lastOut = out.writeBuf[count - 1];
+
+            _in->flush();
+            if (!out.swap(count)) { return -1; }
+            return count;
+        }
+
+        bool bypass = false;
+
+        stream<float> out;
+
+    private:
+        int count;
+        float lastOut = 0.0f;
+        float alpha;
+        float _tau;
+        float _sampleRate;
+        stream<float>* _in;
 
     };
 }

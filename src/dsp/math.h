@@ -22,25 +22,25 @@ namespace dsp {
 
         int run() {
             a_count = _a->read();
+            if (a_count < 0) { return -1; }
             b_count = _b->read();
-            if (a_count < 0 || b_count < 0) { return -1; }
+            if (b_count < 0) { return -1; }
             if (a_count != b_count) {
                 _a->flush();
                 _b->flush();
                 return 0;
             }
 
-            out.aquire();
             if constexpr (std::is_same_v<T, complex_t> || std::is_same_v<T, stereo_t>) {
-                volk_32fc_x2_add_32fc(out.data, _a->data, _b->data, a_count);
+                volk_32fc_x2_add_32fc(out.writeBuf, _a->readBuf, _b->readBuf, a_count);
             }
             else {
-                volk_32f_x2_add_32f(out.data, _a->data, _b->data, a_count);
+                volk_32f_x2_add_32f(out.writeBuf, _a->readBuf, _b->readBuf, a_count);
             }
 
             _a->flush();
             _b->flush();
-            out.write(a_count);
+            if (!out.swap(a_count)) { return -1; }
             return a_count;
         }
 
@@ -72,25 +72,25 @@ namespace dsp {
 
         int run() {
             a_count = _a->read();
+            if (a_count < 0) { return -1; }
             b_count = _b->read();
-            if (a_count < 0 || b_count < 0) { return -1; }
+            if (b_count < 0) { return -1; }
             if (a_count != b_count) {
                 _a->flush();
                 _b->flush();
                 return 0;
             }
 
-            out.aquire();
             if constexpr (std::is_same_v<T, complex_t>) {
-                volk_32fc_x2_multiply_32fc(out.data, _a->data, _b->data, a_count);
+                volk_32fc_x2_multiply_32fc(out.writeBuf, _a->readBuf, _b->readBuf, a_count);
             }
             else {
-                volk_32f_x2_multiply_32f(out.data, _a->data, _b->data, a_count);
+                volk_32f_x2_multiply_32f(out.writeBuf, _a->readBuf, _b->readBuf, a_count);
             }
 
             _a->flush();
             _b->flush();
-            out.write(a_count);
+            if (!out.swap(a_count)) { return -1; }
             return a_count;
         }
 

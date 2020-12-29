@@ -9,92 +9,118 @@
 namespace dsp {
     class untyped_steam {
     public:
-        virtual int write(int size) { return -1; }
+        virtual bool swap(int size) { return false; }
         virtual int read() { return -1; }
         virtual void flush() {}
-        virtual void stopReader() {}
-        virtual void clearReadStop() {}
         virtual void stopWriter() {}
         virtual void clearWriteStop() {}
+        virtual void stopReader() {}
+        virtual void clearReadStop() {}
     };
 
     template <class T>
     class stream : public untyped_steam {
     public:
         stream() {
-            data = (T*)volk_malloc(STREAM_BUFFER_SIZE * sizeof(T), volk_get_alignment());
+            writeBuf = (T*)volk_malloc(STREAM_BUFFER_SIZE * sizeof(T), volk_get_alignment());
+            readBuf = (T*)volk_malloc(STREAM_BUFFER_SIZE * sizeof(T), volk_get_alignment());
         }
 
-        int aquire() {
-            waitReady();
-            if (writerStop) {
-                return -1;
+        ~stream() {
+            volk_free(writeBuf);
+            volk_free(readBuf);
+        }
+
+        bool swap(int size) {
+            {
+                // Wait to either swap or stop
+                std::unique_lock<std::mutex> lck(swapMtx);
+                swapCV.wait(lck, [this]{ return (canSwap || writerStop); });
+
+                // If writer was stopped, abandon operation
+                if (writerStop) { return false; }
+
+                // Swap buffers
+                dataSize = size;
+                T* temp = writeBuf;
+                writeBuf = readBuf;
+                readBuf = temp;
+                canSwap = false;
             }
-            return 0;
-        }
 
-        int write(int size) {
-            std::lock_guard<std::mutex> lck(sigMtx);
-            contentSize = size;
-            dataReady = true;
-            cv.notify_all();
-            return 0;
+            // Notify reader that some data is ready
+            {
+                std::lock_guard<std::mutex> lck(rdyMtx);
+                dataReady = true;
+            }
+            rdyCV.notify_all();
+
+            return true;
         }
 
         int read() {
-            waitData();
-            if (readerStop) {
-                return -1;
-            }
-            return contentSize;
+            // Wait for data to be ready or to be stopped
+            std::unique_lock<std::mutex> lck(rdyMtx);
+            rdyCV.wait(lck, [this]{ return (dataReady || readerStop); });
+
+            return (readerStop ? -1 : dataSize);
         }
 
         void flush() {
-            std::lock_guard<std::mutex> lck(sigMtx);
-            dataReady = false;
-            cv.notify_all();
-        }
+            // Clear data ready
+            {
+                std::lock_guard<std::mutex> lck(rdyMtx);
+                dataReady = false;
+            }
 
-        void stopReader() {
-            std::lock_guard<std::mutex> lck(sigMtx);
-            readerStop = true;
-            cv.notify_all();
-        }
+            // Notify writer that buffers can be swapped
+            {
+                std::lock_guard<std::mutex> lck(swapMtx);
+                canSwap = true;
+            }
 
-        void clearReadStop() {
-            readerStop = false;
+            swapCV.notify_all();
         }
 
         void stopWriter() {
-            std::lock_guard<std::mutex> lck(sigMtx);
-            writerStop = true;
-            cv.notify_all();
+            {
+                std::lock_guard<std::mutex> lck(swapMtx);
+                writerStop = true;
+            }
+            swapCV.notify_all();
         }
 
         void clearWriteStop() {
             writerStop = false;
         }
 
-        T* data;
+        void stopReader() {
+            {
+                std::lock_guard<std::mutex> lck(rdyMtx);
+                readerStop = true;
+            }
+            rdyCV.notify_all();
+        }
+
+        void clearReadStop() {
+            readerStop = false;
+        }
+
+        T* writeBuf;
+        T* readBuf;
 
     private:
-        void waitReady() {
-            std::unique_lock<std::mutex> lck(sigMtx);
-            cv.wait(lck, [this]{ return !dataReady || writerStop; });
-        }
+        std::mutex swapMtx;
+        std::condition_variable swapCV;
+        bool canSwap = true;
 
-        void waitData() {
-            std::unique_lock<std::mutex> lck(sigMtx);
-            cv.wait(lck, [this]{ return dataReady || readerStop; });
-        }
-
-        std::mutex sigMtx;
-        std::condition_variable cv;
+        std::mutex rdyMtx;
+        std::condition_variable rdyCV;
         bool dataReady = false;
 
         bool readerStop = false;
         bool writerStop = false;
 
-        int contentSize = 0;
+        int dataSize = 0;
     };
 }

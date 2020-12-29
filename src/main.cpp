@@ -1,58 +1,59 @@
 
 #include <stdio.h>
-#include <dsp/stream.h>
-#include <dsp/block.h>
-#include <dsp/routing.h>
-#include <dsp/math.h>
-#include <dsp/demodulator.h>
-#include <dsp/filter.h>
 #include <thread>
 #include <chrono>
 #include <iostream>
 #include <random>
+#include <spdlog/spdlog.h>
 
-// Note: will have to use volk_32fc_s32f_power_spectrum_32f(); for the FFT dB calculation
-// use volk_32fc_s32fc_x2_rotator_32fc for the sine source
-// use volk_32f_s32f_32f_fm_detect_32f for FM demod (that's bad)
-// Fix argument order in volk add and multiply
-// add set inputs for adder and multiplier
+#include <dsp/convertion.h>
+#include <dsp/processing.h>
+#include <dsp/resampling.h>
+#include <dsp/sink.h>
+
+#define SAMPLE_COUNT    1000000
+#define RUN_COUNT       100
 
 int main() {
     printf("Hello World!\n");
 
-    const int ROUNDS = 1;
-
-    dsp::stream<dsp::complex_t> in_stream;
-    dsp::FIR demod(&in_stream, 200000, 100000, 100000);
-
-    for (int i = 0; i < 1000000; i++) {
-        in_stream.data[i].i = float(rand())/float((RAND_MAX)) - 1.0f;;
-        in_stream.data[i].q = float(rand())/float((RAND_MAX)) - 1.0f;;
+    spdlog::info("Creating random buffer");
+    float* randBuf =  new float[SAMPLE_COUNT];
+    for (int i = 0; i < SAMPLE_COUNT; i++) {
+        randBuf[i] = static_cast <float> (rand()) / ( static_cast <float> (RAND_MAX/2)) - 1;
     }
 
-    demod.start();
+    spdlog::info("Benchmarking");
 
-    float speed = 0.0f;
+    // ======= DUT =======
+    dsp::stream<float> inputStream;
+    dsp::RealToComplex r2c(&inputStream);
+    dsp::FrequencyXlator<dsp::complex_t> xlator(&r2c.out, 64000000, 14000000);
+    dsp::PowerDecimator decim(&xlator.out, 3);
+    dsp::NullSink<dsp::complex_t> ns(&decim.out);
+    r2c.start();
+    xlator.start();
+    decim.start();
+    ns.start();
+    // ===================
 
-    for (int r = 0; r < ROUNDS; r++) {
+    double totalWait = 0.0f;
+
+    for (int i = 0; i < RUN_COUNT; i++) {
         auto start = std::chrono::high_resolution_clock::now();
-        for (int i = 0; i < 1000; i++) {
-            in_stream.aquire();
-            in_stream.write(1000000);
-            
-            demod.out.read();
-            demod.out.flush();
-        } 
-        auto end = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start); 
 
-        speed += ((1000000.0 / duration.count()) * 1000000000.0) / 1000000.0;
-        std::cout << "Round " << r + 1 << std::endl;
+        memcpy(inputStream.writeBuf, randBuf, SAMPLE_COUNT * sizeof(float));
+        inputStream.swap(SAMPLE_COUNT);
+
+        auto stop = std::chrono::high_resolution_clock::now();
+
+        auto delay = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+        totalWait += delay.count();
     }
 
-    std::cout << "Average Speed: " << (speed/(float)ROUNDS) << " MS/s" << std::endl;
+    double avgWait = totalWait / (double)RUN_COUNT;
 
-    printf("Returning!\n");
+    spdlog::info("Average run took {0} uS ({1} MS/s)", avgWait, 1000000.0 / avgWait);
 
     return 0;
 }
