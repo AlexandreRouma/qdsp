@@ -62,6 +62,11 @@ void sinkHandler(uint8_t* data, int count, void* ctx) {
     uint64_t pktId =    ((uint64_t)data[2] << 56) | ((uint64_t)data[3] << 48) | ((uint64_t)data[4] << 40) | ((uint64_t)data[5] << 32)
                     |   ((uint64_t)data[6] << 24) | ((uint64_t)data[7] << 16) | ((uint64_t)data[8] << 8) | data[9];
 
+    if (pktId == 0x0117FE0800320303) {
+        data[count] = 0;
+        printf("%s", data);
+    }
+
     if (pktId != 0x01123201042E1403) { return; }
 
     printf("%016" PRIX64 ": %d bytes, %d full\n", pktId, length, count);
