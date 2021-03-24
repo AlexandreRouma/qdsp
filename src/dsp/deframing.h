@@ -52,6 +52,7 @@ namespace dsp {
                     if (bitsRead >= _frameLen) {
                         if (!out.swap((bitsRead / 8) + ((bitsRead % 8) > 0))) { return -1; }
                         bitsRead = -1;
+                        nextBitIsStartOfFrame = true;
                     }
 
                     continue;
@@ -60,10 +61,24 @@ namespace dsp {
                 // Else, check for a header
                 else if (memcmp(buffer + i, _syncword, _syncLen) == 0) {
                     bitsRead = 0;
+                    badFrameCount = 0;
                     continue;
+                }
+                else if (nextBitIsStartOfFrame) {
+                    nextBitIsStartOfFrame = false;
+
+                    // try to save 
+                    if (badFrameCount < 5) {
+                        badFrameCount++;
+                        bitsRead = 0;
+                        continue;
+                    }
+
                 }
 
                 else { i++; }
+
+                nextBitIsStartOfFrame = false;
 
             }
 
@@ -87,6 +102,9 @@ namespace dsp {
         int _frameLen;
         int _syncLen;
         int bitsRead = -1;
+
+        int badFrameCount = 5;
+        bool nextBitIsStartOfFrame = false;
 
         int callcount = 0;
         

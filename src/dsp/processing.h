@@ -3,6 +3,7 @@
 #include <volk/volk.h>
 #include <spdlog/spdlog.h>
 #include <string.h>
+#include <stdint.h>
 
 namespace dsp {
     template <class T>
@@ -150,6 +151,71 @@ namespace dsp {
         stream<float>* _in;
 
     };
+
+    template <class T>
+    class FeedForwardAGC : public generic_block<FeedForwardAGC<T>> {
+    public:
+        FeedForwardAGC() {}
+
+        FeedForwardAGC(stream<T>* in) { init(in); }
+
+        ~FeedForwardAGC() { generic_block<FeedForwardAGC<T>>::stop(); }
+
+        void init(stream<T>* in) {
+            _in = in;
+            generic_block<FeedForwardAGC<T>>::registerInput(_in);
+            generic_block<FeedForwardAGC<T>>::registerOutput(&out);
+        }
+
+        void setInput(stream<T>* in) {
+            std::lock_guard<std::mutex> lck(generic_block<FeedForwardAGC<T>>::ctrlMtx);
+            generic_block<FeedForwardAGC<T>>::tempStop();
+            generic_block<FeedForwardAGC<T>>::unregisterInput(_in);
+            _in = in;
+            generic_block<FeedForwardAGC<T>>::registerInput(_in);
+            generic_block<FeedForwardAGC<T>>::tempStart();
+        }
+
+        int run() {
+            count = _in->read();
+            if (count < 0) { return -1; }
+
+            float level = 1e-4;
+
+            // TODO: THIS AGC IS BAAAAAD!!!!
+
+            if constexpr (std::is_same_v<T, float>) {
+                for (int i = 0; i < count; i++) {
+                    if (fabs(_in->readBuf[i]) > level) { level = fabs(_in->readBuf[i]); }
+                }
+                volk_32f_s32f_multiply_32f(out.writeBuf, _in->readBuf, 1.0f / level, count);
+            }
+            if constexpr (std::is_same_v<T, complex_t>) {
+                float iAbs, qAbs, val;
+                for (int i = 0; i < count; i++) {
+                    iAbs = fabs(_in->readBuf[i].i);
+                    qAbs = fabs(_in->readBuf[i].q);
+                    if (iAbs > qAbs) { val = iAbs + 0.4 * qAbs; }
+                    else { val = qAbs + 0.4 * iAbs; }
+                    if (val > level) { level = val; }
+                }
+                lv_32fc_t cplxLvl = {1.0f / level, 1.0f / level};
+                volk_32fc_s32fc_multiply_32fc((lv_32fc_t*)out.writeBuf, (lv_32fc_t*)_in->readBuf, cplxLvl, count);
+            }
+
+            _in->flush();
+            if (!out.swap(count)) { return -1; }
+            return count;
+        }
+
+        stream<T> out;
+
+    private:
+        int count;
+        stream<T>* _in;
+
+    };
+
 
     template <class T>
     class Volume : public generic_block<Volume<T>> {
@@ -363,6 +429,65 @@ namespace dsp {
         int samples = 1;
         int read = 0;
         stream<T>* _in;
+
+    };
+
+    class Threshold : public generic_block<Threshold> {
+    public:
+        Threshold() {}
+
+        Threshold(stream<float>* in) { init(in); }
+
+        ~Threshold() {
+            generic_block<Threshold>::stop();
+            delete[] normBuffer;
+        }
+
+        void init(stream<float>* in) {
+            _in = in;
+            normBuffer = new float[STREAM_BUFFER_SIZE];
+            generic_block<Threshold>::registerInput(_in);
+            generic_block<Threshold>::registerOutput(&out);
+        }
+
+        void setInput(stream<float>* in) {
+            std::lock_guard<std::mutex> lck(generic_block<Threshold>::ctrlMtx);
+            generic_block<Threshold>::tempStop();
+            generic_block<Threshold>::unregisterInput(_in);
+            _in = in;
+            generic_block<Threshold>::registerInput(_in);
+            generic_block<Threshold>::tempStart();
+        }
+
+        void setLevel(float level) {
+            _level = level;
+        }
+
+        float getLevel() {
+            return _level;
+        }
+
+        int run() {
+            count = _in->read();
+            if (count < 0) { return -1; }
+
+            for (int i = 0; i < count; i++) {
+                out.writeBuf[i] = (_in->readBuf[i] > 0.0f);
+            }
+
+            _in->flush();
+            if (!out.swap(count)) { return -1; }
+            return count; 
+        }
+
+        stream<uint8_t> out;
+
+
+    private:
+        int count;
+        float* normBuffer;
+        float _level = -50.0f;
+        stream<float>* _in;
 
     };
 }

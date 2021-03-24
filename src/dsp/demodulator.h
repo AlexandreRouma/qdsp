@@ -5,6 +5,7 @@
 #include <dsp/processing.h>
 #include <dsp/routing.h>
 #include <spdlog/spdlog.h>
+#include <dsp/pll.h>
 
 #define FAST_ATAN2_COEF1    FL_M_PI / 4.0f
 #define FAST_ATAN2_COEF2    3.0f * FAST_ATAN2_COEF1
@@ -501,5 +502,26 @@ namespace dsp {
         lv_32fc_t phase;
         lv_32fc_t phaseDelta;
 
+    };
+
+    class MSKDemod : public generic_hier_block<MSKDemod> {
+    public:
+        MSKDemod() {}
+        MSKDemod(stream<complex_t>* input, float sampleRate, float deviation, float baudRate) { init(input, sampleRate, deviation, baudRate); }
+
+        void init(stream<complex_t>* input, float sampleRate, float deviation, float baudRate) {
+            demod.init(input, sampleRate, deviation);
+            recov.init(&demod.out, sampleRate / baudRate, powf(0.01f, 2) / 4.0f, 0.01, 100e-6f);
+            out = &recov.out;
+
+            generic_hier_block<MSKDemod>::registerBlock(&demod);
+            generic_hier_block<MSKDemod>::registerBlock(&recov);
+        }
+
+        stream<float>* out = NULL;
+
+    private:
+        FloatFMDemod demod;
+        MMClockRecovery recov;
     };
 }
