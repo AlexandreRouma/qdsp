@@ -268,7 +268,6 @@ namespace dsp {
                 out.writeBuf[i] = val;
                 _gain += (_setPoint - val.amplitude()) * _rate;
                 if (_gain > _maxGain) { _gain = _maxGain; }
-                else if (_gain < _minGain) { _gain = _minGain; }
             }
 
             _in->flush();
@@ -281,7 +280,6 @@ namespace dsp {
     private:
         float _gain = 1.0f;
         float _setPoint = 1.0f;
-        float _minGain = 10e-4;
         float _maxGain = 10e4;
         float _rate = 0.00001f;
         
