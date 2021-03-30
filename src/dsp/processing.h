@@ -286,6 +286,53 @@ namespace dsp {
 
     };
 
+    class DelayImag : public generic_block<DelayImag> {
+    public:
+        DelayImag() {}
+
+        DelayImag(stream<complex_t>* in) { init(in); }
+
+        void init(stream<complex_t>* in) {
+            _in = in;
+            generic_block<DelayImag>::registerInput(_in);
+            generic_block<DelayImag>::registerOutput(&out);
+        }
+
+        void setInput(stream<complex_t>* in) {
+            std::lock_guard<std::mutex> lck(generic_block<DelayImag>::ctrlMtx);
+            generic_block<DelayImag>::tempStop();
+            generic_block<DelayImag>::unregisterInput(_in);
+            _in = in;
+            generic_block<DelayImag>::registerInput(_in);
+            generic_block<DelayImag>::tempStart();
+        }
+
+        int run() {
+            int count = _in->read();
+            if (count < 0) { return -1; }
+
+            dsp::complex_t val;
+            for (int i = 0; i < count; i++) {
+                val = _in->readBuf[i];
+                out.writeBuf[i].re = val.re;
+                out.writeBuf[i].im = lastIm;
+                lastIm = val.im;
+            }
+
+            _in->flush();
+            if (!out.swap(count)) { return -1; }
+            return count;
+        }
+
+        stream<complex_t> out;
+
+    private:
+        float lastIm = 0.0f;
+        stream<complex_t>* _in;
+
+    };
+
+
 
     template <class T>
     class Volume : public generic_block<Volume<T>> {

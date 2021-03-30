@@ -54,22 +54,26 @@ int16_t outSamples[STREAM_BUFFER_SIZE];
 
 void sinkHandler(dsp::complex_t* data, int count, void* ctx) {
     for (int i = 0; i < count; i++) {
-        outSamples[i * 2] = data[i].re * 32768.0f;
-        outSamples[(i * 2) + 1] = data[i].im * 32768.0f;
+        outSamples[i * 2] = data[i].re * 8000.0f;
+        outSamples[(i * 2) + 1] = data[i].im * 8000.0f;
     }
     writer.writeSamples(outSamples, count * 2 * sizeof(int16_t));
 }
 
 
 dsp::HandlerSource<dsp::complex_t> source(sourceHandler, NULL);
-dsp::ComplexAGC agc(&source.out);
+dsp::ComplexAGC agc(&source.out, 1.0f, 65536, 10e-4);
 dsp::CostasLoop<4> costas(&agc.out, 0.01f);
-dsp::HandlerSink<dsp::complex_t> sink(&costas.out, sinkHandler, NULL);
+dsp::DelayImag delay(&costas.out);
+dsp::MMClockRecovery<dsp::complex_t> recov(&delay.out, 5000000.0f / 3125000.0f, (0.01 * 0.01) / 4, 0.01, 0.005);
+dsp::HandlerSink<dsp::complex_t> sink(&recov.out, sinkHandler, NULL);
 
 int main() {
     source.start();
     agc.start();
     costas.start();
+    delay.start();
+    recov.start();
     sink.start();
 
     printf("Started\n");
