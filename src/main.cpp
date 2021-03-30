@@ -1,76 +1,80 @@
 #include <stdio.h>
-#include <dsp/clock_recovery.h>
+#include <thread>
+#include <chrono>
+#include <iostream>
+#include <random>
+#include <spdlog/spdlog.h>
+#include <wav.h>
+#include <wavreader.h>
 
-/*
-    Standard throughput testbench
-*/
+#ifdef _WIN32
+#include <Windows.h>
+#endif
 
-#define BLOCK_SIZE      1000000
+#include <dsp/pll.h>
+#include <dsp/stream.h>
+#include <dsp/demodulator.h>
+#include <dsp/window.h>
+#include <dsp/resampling.h>
+#include <dsp/processing.h>
+#include <dsp/routing.h>
 
-//dsp::stream<float> input;
-//dsp::stream<dsp::complex_t> input;
-dsp::stream<dsp::complex_t> input;
+#include <dsp/deframing.h>
+#include <dsp/falcon_fec.h>
+#include <dsp/falcon_packet.h>
+#include <dsp/source.h>
+#include <dsp/sink.h>
 
-// ================ DUT ================
-dsp::MMClockRecovery<dsp::complex_t> dut(&input, 2.33f, powf(0.01f, 2) / 4.0f, 0.01f, 100e-6f);
-// =====================================
+#include <dsp/utils/ccsds.h>
 
-// Counter
-uint64_t samples = 0;
+WavReader reader("D:/Downloads/baseband_10-20-29_22-03-2021_2247_5_one_minute.wav");
+WavWriter writer("D:/starship_costas.wav", 16, 2, 5000000);
 
-// Writer thread
-void writeWorker() {
-    // Create buffer
-    // float* buffer = new float[STREAM_BUFFER_SIZE];
-    // for (int i = 0; i < BLOCK_SIZE; i++) {
-    //     buffer[i] = ((static_cast <float> (rand()) / static_cast <float> (RAND_MAX)) * 2.0f) - 1;
-    // }
+uint64_t totalRead = 0;
 
-    dsp::complex_t* buffer = new dsp::complex_t[STREAM_BUFFER_SIZE];
-    for (int i = 0; i < BLOCK_SIZE; i++) {
-        buffer[i].re = ((static_cast <float> (rand()) / static_cast <float> (RAND_MAX)) * 2.0f) - 1;
-        buffer[i].im = ((static_cast <float> (rand()) / static_cast <float> (RAND_MAX)) * 2.0f) - 1;
+int sourceHandler(dsp::complex_t* data, void* ctx) {
+    if (totalRead >= reader.hdr.dataSize) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        writer.close();
+        printf("Done\n");
+        while(1);
     }
 
-    // dsp::stereo_t* buffer = new dsp::stereo_t[STREAM_BUFFER_SIZE];
-    // for (int i = 0; i < BLOCK_SIZE; i++) {
-    //     buffer[i].l = ((static_cast <float> (rand()) / static_cast <float> (RAND_MAX)) * 2.0f) - 1;
-    //     buffer[i].r = ((static_cast <float> (rand()) / static_cast <float> (RAND_MAX)) * 2.0f) - 1;
-    // }
-
-    // Write
-    while (true) {
-        memcpy(input.writeBuf, buffer, BLOCK_SIZE * sizeof(dsp::complex_t));
-        input.swap(BLOCK_SIZE);
+    int16_t samples[1024 * 2];
+    reader.readSamples(samples, 1024 * 2 * sizeof(int16_t));
+    for (int i = 0; i < 1024; i++) {
+        data[i].re = (float)samples[i * 2] / 32768.0f;
+        data[i].im = (float)samples[(i * 2) + 1] / 32768.0f;
     }
+    totalRead += 1024 * 2 * sizeof(int16_t);
+    return 1024;
 }
 
-void readWorker() {
-    while (true) {
-        samples += dut.out.read();
-        dut.out.flush();
+int16_t outSamples[STREAM_BUFFER_SIZE];
 
-        // samples += dut.out_left.read();
-        // dut.out_right.read();
-        // dut.out_left.flush();
-        // dut.out_right.flush();
+void sinkHandler(dsp::complex_t* data, int count, void* ctx) {
+    for (int i = 0; i < count; i++) {
+        outSamples[i * 2] = data[i].re * 32768.0f;
+        outSamples[(i * 2) + 1] = data[i].im * 32768.0f;
     }
+    writer.writeSamples(outSamples, count * 2 * sizeof(int16_t));
 }
+
+
+dsp::HandlerSource<dsp::complex_t> source(sourceHandler, NULL);
+dsp::ComplexAGC agc(&source.out);
+dsp::CostasLoop<4> costas(&agc.out, 0.01f);
+dsp::HandlerSink<dsp::complex_t> sink(&costas.out, sinkHandler, NULL);
 
 int main() {
-    // Start DUT
-    dut.start();
+    source.start();
+    agc.start();
+    costas.start();
+    sink.start();
 
-    // Start workers
-    std::thread writer(writeWorker);
-    std::thread reader(readWorker);
+    printf("Started\n");
 
-    // Run test
-    while (true) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(10000));
-        printf("%" PRIu64 " S/s\n", samples / 10);
-        samples = 0;
-    }
+    while(1);
 
     return 0;
 }

@@ -232,6 +232,63 @@ namespace dsp {
 
     };
 
+    class ComplexAGC : public generic_block<ComplexAGC> {
+    public:
+        ComplexAGC() {}
+
+        ComplexAGC(stream<complex_t>* in, float ) { init(in, rate); }
+
+        void init(stream<complex_t>* in, float setPoint, float minGain, float maxGain, float rate) {
+            _in = in;
+            _setPoint = setPoint;
+            _minGain = minGain;
+            _maxGain = maxGain;
+            _rate = rate;
+            
+            generic_block<ComplexAGC>::registerInput(_in);
+            generic_block<ComplexAGC>::registerOutput(&out);
+        }
+
+        void setInput(stream<complex_t>* in) {
+            std::lock_guard<std::mutex> lck(generic_block<ComplexAGC>::ctrlMtx);
+            generic_block<ComplexAGC>::tempStop();
+            generic_block<ComplexAGC>::unregisterInput(_in);
+            _in = in;
+            generic_block<ComplexAGC>::registerInput(_in);
+            generic_block<ComplexAGC>::tempStart();
+        }
+
+        int run() {
+            int count = _in->read();
+            if (count < 0) { return -1; }
+
+            dsp::complex_t val;
+            for (int i = 0; i < count; i++) {
+                val = _in->readBuf[i] * _gain;
+                out.writeBuf[i] = val;
+                _gain += (1.0f - val.amplitude()) * _rate;
+                if (_gain > _maxGain) { _gain = _maxGain; }
+                else if (_gain < _minGain) { _gain = _minGain; }
+            }
+
+            _in->flush();
+            if (!out.swap(count)) { return -1; }
+            return count;
+        }
+
+        stream<complex_t> out;
+
+    private:
+        float _gain = 1.0f;
+        float _setPoint = 1.0f;
+        float _minGain = 10e-4;
+        float _maxGain = 10e4;
+        float _rate = 0.00001f;
+        
+        stream<complex_t>* _in;
+
+    };
+
 
     template <class T>
     class Volume : public generic_block<Volume<T>> {
