@@ -266,7 +266,7 @@ namespace dsp {
             for (int i = 0; i < count; i++) {
                 val = _in->readBuf[i] * _gain;
                 out.writeBuf[i] = val;
-                _gain += (1.0f - val.amplitude()) * _rate;
+                _gain += (_setPoint - val.amplitude()) * _rate;
                 if (_gain > _maxGain) { _gain = _maxGain; }
                 else if (_gain < _minGain) { _gain = _minGain; }
             }
