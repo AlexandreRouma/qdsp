@@ -236,12 +236,11 @@ namespace dsp {
     public:
         ComplexAGC() {}
 
-        ComplexAGC(stream<complex_t>* in, float ) { init(in, rate); }
+        ComplexAGC(stream<complex_t>* in, float setPoint, float maxGain, float rate) { init(in, setPoint, maxGain, rate); }
 
-        void init(stream<complex_t>* in, float setPoint, float minGain, float maxGain, float rate) {
+        void init(stream<complex_t>* in, float setPoint, float maxGain, float rate) {
             _in = in;
             _setPoint = setPoint;
-            _minGain = minGain;
             _maxGain = maxGain;
             _rate = rate;
             
@@ -281,7 +280,7 @@ namespace dsp {
         float _gain = 1.0f;
         float _setPoint = 1.0f;
         float _maxGain = 10e4;
-        float _rate = 0.00001f;
+        float _rate = 10e-4;
         
         stream<complex_t>* _in;
 
