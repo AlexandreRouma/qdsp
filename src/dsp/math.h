@@ -10,8 +10,6 @@ namespace dsp {
 
         Add(stream<T>* a, stream<T>* b) { init(a, b); }
 
-        ~Add() { generic_block<Add<T>>::stop(); }
-
         void init(stream<T>* a, stream<T>* b) {
             _a = a;
             _b = b;
@@ -21,9 +19,9 @@ namespace dsp {
         }
 
         int run() {
-            a_count = _a->read();
+            int a_count = _a->read();
             if (a_count < 0) { return -1; }
-            b_count = _b->read();
+            int b_count = _b->read();
             if (b_count < 0) { return -1; }
             if (a_count != b_count) {
                 _a->flush();
@@ -47,7 +45,6 @@ namespace dsp {
         stream<T> out;
 
     private:
-        int a_count, b_count;
         stream<T>* _a;
         stream<T>* _b;
 
@@ -60,8 +57,6 @@ namespace dsp {
 
         Substract(stream<T>* a, stream<T>* b) { init(a, b); }
 
-        ~Substract() { generic_block<Substract<T>>::stop(); }
-
         void init(stream<T>* a, stream<T>* b) {
             _a = a;
             _b = b;
@@ -71,9 +66,9 @@ namespace dsp {
         }
 
         int run() {
-            a_count = _a->read();
+            int a_count = _a->read();
             if (a_count < 0) { return -1; }
-            b_count = _b->read();
+            int b_count = _b->read();
             if (b_count < 0) { return -1; }
             if (a_count != b_count) {
                 _a->flush();
@@ -85,7 +80,7 @@ namespace dsp {
                 volk_32f_x2_subtract_32f((float*)out.writeBuf, (float*)_a->readBuf, (float*)_b->readBuf, a_count * 2);
             }
             else {
-                volk_32f_x2_add_32f(out.writeBuf, _a->readBuf, _b->readBuf, a_count);
+                volk_32f_x2_subtract_32f(out.writeBuf, _a->readBuf, _b->readBuf, a_count);
             }
 
             _a->flush();
@@ -97,7 +92,6 @@ namespace dsp {
         stream<T> out;
 
     private:
-        int a_count, b_count;
         stream<T>* _a;
         stream<T>* _b;
 
@@ -110,8 +104,6 @@ namespace dsp {
 
         Multiply(stream<T>* a, stream<T>* b) { init(a, b); }
 
-        ~Multiply() { generic_block<Multiply>::stop(); }
-
         void init(stream<T>* a, stream<T>* b) {
             _a = a;
             _b = b;
@@ -121,9 +113,9 @@ namespace dsp {
         }
 
         int run() {
-            a_count = _a->read();
+            int a_count = _a->read();
             if (a_count < 0) { return -1; }
-            b_count = _b->read();
+            int b_count = _b->read();
             if (b_count < 0) { return -1; }
             if (a_count != b_count) {
                 _a->flush();
@@ -132,7 +124,7 @@ namespace dsp {
             }
 
             if constexpr (std::is_same_v<T, complex_t>) {
-                volk_32fc_x2_multiply_32fc(out.writeBuf, _a->readBuf, _b->readBuf, a_count);
+                volk_32fc_x2_multiply_32fc((lv_32fc_t*)out.writeBuf, (lv_32fc_t*)_a->readBuf, (lv_32fc_t*)_b->readBuf, a_count);
             }
             else {
                 volk_32f_x2_multiply_32f(out.writeBuf, _a->readBuf, _b->readBuf, a_count);
@@ -147,7 +139,6 @@ namespace dsp {
         stream<T> out;
 
     private:
-        int a_count, b_count;
         stream<T>* _a;
         stream<T>* _b;
 

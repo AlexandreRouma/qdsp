@@ -6,6 +6,7 @@
 #include <dsp/routing.h>
 #include <spdlog/spdlog.h>
 #include <dsp/pll.h>
+#include <dsp/clock_recovery.h>
 
 #define FAST_ATAN2_COEF1    FL_M_PI / 4.0f
 #define FAST_ATAN2_COEF2    3.0f * FAST_ATAN2_COEF1
@@ -25,7 +26,7 @@ inline float fast_arctan2(float y, float x) {
     if (y < 0.0f) {
         return -angle;
     }
-   return angle;
+    return angle;
 }
 
 namespace dsp {
@@ -34,8 +35,6 @@ namespace dsp {
         FloatFMDemod() {}
 
         FloatFMDemod(stream<complex_t>* in, float sampleRate, float deviation) { init(in, sampleRate, deviation); }
-
-        ~FloatFMDemod() { generic_block<FloatFMDemod>::stop(); }
 
         void init(stream<complex_t>* in, float sampleRate, float deviation) {
             _in = in;
@@ -80,14 +79,13 @@ namespace dsp {
         }
 
         int run() {
-            count = _in->read();
+            int count = _in->read();
             if (count < 0) { return -1; }
 
             // This is somehow faster than volk...
-
             float diff, currentPhase;
             for (int i = 0; i < count; i++) {
-                currentPhase = fast_arctan2(_in->readBuf[i].i, _in->readBuf[i].q);
+                currentPhase = fast_arctan2(_in->readBuf[i].im, _in->readBuf[i].re);
                 diff = currentPhase - phase;
                 if (diff > 3.1415926535f)        { diff -= 2 * 3.1415926535f; }
                 else if (diff <= -3.1415926535f) { diff += 2 * 3.1415926535f; }
@@ -103,8 +101,8 @@ namespace dsp {
         stream<float> out;
 
     private:
-        int count;
-        float phase, phasorSpeed, _sampleRate, _deviation;
+        float phase = 0;
+        float phasorSpeed, _sampleRate, _deviation;
         stream<complex_t>* _in;
 
     };
@@ -114,8 +112,6 @@ namespace dsp {
         FMDemod() {}
 
         FMDemod(stream<complex_t>* in, float sampleRate, float deviation) { init(in, sampleRate, deviation); }
-
-        ~FMDemod() { generic_block<FMDemod>::stop(); }
 
         void init(stream<complex_t>* in, float sampleRate, float deviation) {
             _in = in;
@@ -160,14 +156,14 @@ namespace dsp {
         }
 
         int run() {
-            count = _in->read();
+            int count = _in->read();
             if (count < 0) { return -1; }
 
             // This is somehow faster than volk...
 
             float diff, currentPhase;
             for (int i = 0; i < count; i++) {
-                currentPhase = fast_arctan2(_in->readBuf[i].i, _in->readBuf[i].q);
+                currentPhase = fast_arctan2(_in->readBuf[i].im, _in->readBuf[i].re);
                 diff = currentPhase - phase;
                 if (diff > 3.1415926535f)        { diff -= 2 * 3.1415926535f; }
                 else if (diff <= -3.1415926535f) { diff += 2 * 3.1415926535f; }
@@ -184,8 +180,8 @@ namespace dsp {
         stream<stereo_t> out;
 
     private:
-        int count;
-        float phase, phasorSpeed, _sampleRate, _deviation;
+        float phase = 0;
+        float phasorSpeed, _sampleRate, _deviation;
         stream<complex_t>* _in;
 
     };
@@ -197,7 +193,7 @@ namespace dsp {
         StereoFMDemod(stream<complex_t>* in, float sampleRate, float deviation) { init(in, sampleRate, deviation); }
 
         ~StereoFMDemod() {
-            stop();
+            generic_block<StereoFMDemod>::stop();
             delete[] doubledPilot;
             delete[] a_minus_b;
             delete[] a_out;
@@ -339,8 +335,6 @@ namespace dsp {
 
         AMDemod(stream<complex_t>* in) { init(in); }
 
-        ~AMDemod() { generic_block<AMDemod>::stop(); }
-
         void init(stream<complex_t>* in) {
             _in = in;
             generic_block<AMDemod>::registerInput(_in);
@@ -357,13 +351,14 @@ namespace dsp {
         }
 
         int run() {
-            count = _in->read();
+            int count = _in->read();
             if (count < 0) { return -1; }
 
             volk_32fc_magnitude_32f(out.writeBuf, (lv_32fc_t*)_in->readBuf, count);
 
             _in->flush();
 
+            float avg;
             volk_32f_accumulator_s32f(&avg, out.writeBuf, count);
             avg /= (float)count;
 
@@ -378,8 +373,6 @@ namespace dsp {
         stream<float> out;
 
     private:
-        float avg;
-        int count;
         stream<complex_t>* _in;
 
     };
@@ -480,7 +473,7 @@ namespace dsp {
         }
 
         int run() {
-            count = _in->read();
+            int count = _in->read();
             if (count < 0) { return -1; }
 
             volk_32fc_s32fc_x2_rotator_32fc(buffer, (lv_32fc_t*)_in->readBuf, phaseDelta, &phase, count);
@@ -494,7 +487,6 @@ namespace dsp {
         stream<float> out;
 
     private:
-        int count;
         int _mode;
         float _sampleRate, _bandWidth;
         stream<complex_t>* _in;
@@ -511,7 +503,7 @@ namespace dsp {
 
         void init(stream<complex_t>* input, float sampleRate, float deviation, float baudRate) {
             demod.init(input, sampleRate, deviation);
-            recov.init(&demod.out, sampleRate / baudRate, powf(0.01f, 2) / 4.0f, 0.01, 100e-6f);
+            recov.init(&demod.out, sampleRate / baudRate, powf(0.01f, 2) / 4.0f, 0.01f, 100e-6f);
             out = &recov.out;
 
             generic_hier_block<MSKDemod>::registerBlock(&demod);
@@ -522,6 +514,6 @@ namespace dsp {
 
     private:
         FloatFMDemod demod;
-        MMClockRecovery recov;
+        MMClockRecovery<float> recov;
     };
 }

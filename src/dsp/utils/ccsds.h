@@ -62,9 +62,8 @@ namespace dsp {
 
         const uint32_t ASM_VALUE = 0x1ACFFC1D;
         const uint8_t ASM_BYTES[4] = {0x1A, 0xCF, 0xFC, 0x1D};
-        const uint8_t ASM_BITS[32] = {0,0,0,1,1,0,1,0,1,1,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,1,1,1,0,1};
-        //                            0 0  0 1  1 0  1 0  1 1  0 0  1 1  1 1  1 1  1 1  1 1  0 0  0 0  0 1  1 1  0 1
-        //                            0 1  0 0  0 0  1 0  0 0  0 1  0 1  0 1  0 1  1 0  1 1  1 1  
+        const uint8_t ASM_SYMS[16] = {0b00, 0b01, 0b10, 0b10, 0b11, 0b00, 0b11, 0b11, 0b11, 0b11, 0b11, 0b00, 0b00, 0b01, 0b11, 0b01}; 
+        const uint8_t ASM_BITS[32] = {0,0,0,1,1,0,1,0,1,1,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,1,1,1,0,1}; 
 
         class FrameDataDecoder {
         public:
