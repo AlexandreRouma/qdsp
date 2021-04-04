@@ -195,7 +195,7 @@ namespace dsp {
                 for (int i = 0; i < toProcess; i++) {
                     level = 1e-4;
                     for (int j = 0; j < sampleCount; j++) {
-                        val = fabsf(buffer[i + j])
+                        val = fabsf(buffer[i + j]);
                         if (val > level) { level = val; }
                     }
                     out.writeBuf[i] = buffer[i] / level;
@@ -243,7 +243,6 @@ namespace dsp {
             _setPoint = setPoint;
             _maxGain = maxGain;
             _rate = rate;
-            
             generic_block<ComplexAGC>::registerInput(_in);
             generic_block<ComplexAGC>::registerOutput(&out);
         }
@@ -255,6 +254,18 @@ namespace dsp {
             _in = in;
             generic_block<ComplexAGC>::registerInput(_in);
             generic_block<ComplexAGC>::tempStart();
+        }
+
+        void setSetPoint(float setPoint) {
+            _setPoint = setPoint;
+        }
+
+        void setMaxGain(float maxGain) {
+            _maxGain = maxGain;
+        }
+
+        void setRate(float rate) {
+            _rate = rate;
         }
 
         int run() {

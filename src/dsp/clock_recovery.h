@@ -88,6 +88,30 @@ namespace dsp {
             generic_block<MMClockRecovery<T>>::registerOutput(&out);
         }
 
+        void setOmega(float omega, float omegaRelLimit) {
+            generic_block<MMClockRecovery<T>>::tempStop();
+            omegaMin = _omega - (_omega * _omegaRelLimit);
+            omegaMax = _omega + (_omega * _omegaRelLimit);
+            _omega = omega;
+            _dynOmega = _omega;
+            generic_block<MMClockRecovery<T>>::tempStart();
+        }
+
+        void setGains(float omegaGain, float muGain) {
+            generic_block<MMClockRecovery<T>>::tempStop();
+            _gainOmega = omegaGain;
+            _muGain = muGain;
+            generic_block<MMClockRecovery<T>>::tempStart();
+        }
+
+        void setOmegaRelLimit(float omegaRelLimit) {
+            generic_block<MMClockRecovery<T>>::tempStop();
+            _omegaRelLimit = omegaRelLimit;
+            omegaMin = _omega - (_omega * _omegaRelLimit);
+            omegaMax = _omega + (_omega * _omegaRelLimit);
+            generic_block<MMClockRecovery<T>>::tempStart();
+        }
+
         void setInput(stream<T>* in) {
             generic_block<MMClockRecovery<T>>::tempStop();
             generic_block<MMClockRecovery<T>>::unregisterInput(_in);
@@ -192,7 +216,7 @@ namespace dsp {
         int count;
 
         // Delay buffer
-        T delay[15];
+        T delay[1024];
         int nextOffset = 0;
 
         // Configuration
